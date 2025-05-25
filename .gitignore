@@ -1,0 +1,8 @@
+*.ccout
+*.bin
+*.out
+*.d
+*.o
+*.so
+build/
+cobalt

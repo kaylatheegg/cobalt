@@ -1,0 +1,1 @@
+y=40,x;main(i){for(;y--;puts(""))for(x=170;x--;printf(L" .'-+=%@#"+i/12))for(_Complex z=i=0;cabs(z)<2&i++<99;z=z*z-x/50.+y/20.i+1+1i);}
