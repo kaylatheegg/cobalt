@@ -55,7 +55,7 @@ int parse_file(cobalt_ctx* ctx);
     TOKEN(CTOK_QUESTION, "?") \
     TOKEN(CTOK_COLON, ":") \
     TOKEN(CTOK_COLON_COLON, "::") \
-    TOKEN(CTOK_SEMICOLOM, ";") \
+    TOKEN(CTOK_SEMICOLON, ";") \
     TOKEN(CTOK_ELLIPSIS, "...") \
     TOKEN(CTOK_EQ, "=") \
     TOKEN(CTOK_ASSIGN_TIMES, "*=") \
@@ -71,7 +71,7 @@ int parse_file(cobalt_ctx* ctx);
     TOKEN(CTOK_COMMA, ",") \
     TOKEN(CTOK_HASH, "#") \
     TOKEN(CTOK_HASH_HASH, "##") \
-    
+    /* constant types */ \
 
 typedef enum: u8 {
 #define TOKEN(tok, str) tok,
