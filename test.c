@@ -1,2 +1,4 @@
-/* mrrow mrrp*/meow \
-xyz
+int main() {
+    a = 3;
+    return a + b + c;
+}

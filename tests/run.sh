@@ -2,7 +2,7 @@
 
 CC="cobalt"
 
-CFLAGS=""
+CFLAGS="-nocol"
 
 cp ../cobalt ./cobalt
 

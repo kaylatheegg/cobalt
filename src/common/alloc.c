@@ -15,3 +15,12 @@ void* crealloc(void* ptr, size_t size) {
 void cfree(void* ptr) {
     free(ptr);
 }
+
+void* ccharalloc(size_t size, u8 c) {
+    u8* ptr = malloc(size);
+    if (ptr == NULL) crash("Tried to charalloc ptr of size %d, failed with errno %s", size, strerror(errno));
+    for (size_t i = 0; i < size; i++) {
+        ptr[i] = c;
+    }
+    return ptr; 
+}

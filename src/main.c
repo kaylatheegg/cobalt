@@ -7,7 +7,8 @@ void parse_args(cobalt_ctx* ctx);
 int main(int argc, char* argv[]) {
     cobalt_ctx ctx = {.output_path = constr(""),
                       .curr_file = constr(""),
-                      .implicit_output = false};
+                      .implicit_output = false,
+                      .no_colour = false};
 
     ctx.args = vec_new(string, 1);
 
@@ -48,6 +49,9 @@ void parse_args(cobalt_ctx* ctx) {
             //get next arg
             parse_state = 1;
             continue;
+        }
+        if (parse_state == 0 && string_eq(*arg, constr("-nocol"))) {
+            ctx->no_colour = true;
         }
         if (parse_state == 0) {
             //scan end of this string to see if its .c
