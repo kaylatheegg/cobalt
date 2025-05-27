@@ -31,6 +31,8 @@ void _vec_reserve(_VecGeneric* v, size_t stride, size_t slots);
 void _vec_expand_if_necessary(_VecGeneric* v, size_t stride);
 void _vec_destroy(_VecGeneric* v);
 void _vec_shrink(_VecGeneric* v, size_t stride);
+void _vec_remove(_VecGeneric* v, size_t stride, size_t index);
+void _vec_insert_space(_VecGeneric* v, size_t stride, size_t index);
 
 #define vec_stride(v) sizeof(*(v)->at)
 #define vec_new(type, initial_cap) (*(Vec(type)*) _vec_new(sizeof(type), initial_cap))
@@ -43,6 +45,12 @@ void _vec_shrink(_VecGeneric* v, size_t stride);
     (v)->at[(v)->len++] = (element); \
 } while (0)
 #define vec_reserve(v, num_slots) _vec_reserve((_VecGeneric*)(v), vec_stride((v)), num_slots)
+#define vec_remove(v, index) _vec_remove((_VecGeneric*)(v), vec_stride((v)), index)
+#define vec_insert(v, index, element) do { \
+    _vec_insert_space((_VecGeneric*)v, vec_stride((v)), index); \
+    (v)->at[(index)] = (element); \
+} while(0)
+
 
 #define vec_pop(v) ((v)->at[--(v)->len])
 #define vec_pop_front(v) ((v)->at[--(v)->len])

@@ -1,4 +1,6 @@
-int main() {
-    a = 3;
-    return a + b + c;
-}
+#define XYZ xyz
+#define ABC"123"
+
+XYZ ABC
+
+#include "src/main.c"

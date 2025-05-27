@@ -1,10 +1,9 @@
 #pragma once
 #define PARSE_H
 
-int parse_file(cobalt_ctx* ctx);
-
 #define TOKENS \
     TOKEN(TOK_INVALID, "[INVALID]") \
+    TOKEN(TOK_WHITESPACE, "whitespace") \
     /* token: */ \
     TOKEN(TOK_KEYWORD, "keyword") \
     TOKEN(TOK_IDENTIFIER, "identifier") \
@@ -79,26 +78,44 @@ typedef enum: u8 {
 #undef TOKEN
 } token_type;
 
-
 typedef struct {
     token_type type;
     token_type itype;
     string tok;
+    bool after_newline;
     u32 line;
+    bool was_included;
+    string included_from;
 } token;
 
 Vec_typedef(token);
 
-typedef struct {
+typedef struct _parser_ctx {
     Vec(token) tokens;
     size_t curr_offset;
     size_t curr_line;
     Vec(string) logical_lines;
     cobalt_ctx* ctx;
+    Vec(string) included_files;
 } parser_ctx;
+
+typedef struct {
+    bool is_function;
+    Vec(token) arguments;
+    Vec(token) replacement_list;
+    token name;
+} macro_define;
+
+Vec_typedef(macro_define);
+
+int parse_file(cobalt_ctx* ctx, bool is_include);
 
 void parser_phase1(cobalt_ctx* ctx);
 int parser_phase2(parser_ctx* ctx, Vec(string) physical_lines);
 int parser_phase3(parser_ctx* ctx);
+int parser_phase4(parser_ctx* ctx);
+
+void print_token_stream(parser_ctx* ctx);
 
 void print_lexing_error(parser_ctx* ctx, char* format, ...);
+void print_parsing_error(parser_ctx* ctx, token err_tok, char* format, ...);

@@ -8,7 +8,9 @@ int main(int argc, char* argv[]) {
     cobalt_ctx ctx = {.output_path = constr(""),
                       .curr_file = constr(""),
                       .implicit_output = false,
-                      .no_colour = false};
+                      .no_colour = false,
+                      .include_paths = vec_new(string, 1)};
+    //default family of system headers
 
     ctx.args = vec_new(string, 1);
 
@@ -17,6 +19,8 @@ int main(int argc, char* argv[]) {
     }
 
     parse_args(&ctx);
+    vec_append(&ctx.include_paths, constr("/usr/include/"));
+    vec_append(&ctx.include_paths, constr("/usr/include/linux/"));
     if (ctx.curr_file.len == 0) {
         printf("expected file\n");
         return -1;
@@ -27,7 +31,7 @@ int main(int argc, char* argv[]) {
         ctx.output_path = strprintf(str_fmt".out", str_arg(string_make(ctx.curr_file.raw, ctx.curr_file.len - 2)));
     }
 
-    int retval = parse_file(&ctx);
+    int retval = parse_file(&ctx, false);
     if (retval == 0) {
         //more corpses
     }
@@ -36,33 +40,55 @@ int main(int argc, char* argv[]) {
 }
 
 void parse_args(cobalt_ctx* ctx) {
-    int parse_state = 0; //bad. make this cleaner when more args get added
     for_vec(string* arg, &ctx->args) {
-        if (parse_state == 1) {
-            // blindly set this arg to output path
-            ctx->output_path = *arg;
-            parse_state = 0;
-            continue;
-        }
-        if (parse_state == 0 && string_eq(*arg, constr("-o"))) {
-            //we've got an output path
-            //get next arg
-            parse_state = 1;
-            continue;
-        }
-        if (parse_state == 0 && string_eq(*arg, constr("-nocol"))) {
+        if (string_eq(*arg, constr("-nocol"))) {
             ctx->no_colour = true;
         }
-        if (parse_state == 0) {
-            //scan end of this string to see if its .c
-            string new_arg = *arg;
-            new_arg.raw = new_arg.raw + arg->len - 2;
-            new_arg.len = 2;
-            if (string_eq(new_arg, constr(".c"))) {
-                //we've got a file name
-                ctx->curr_file = *arg;
+        if (string_eq(*arg, constr("-o"))) {
+            //we've got an output path
+            if (_index + 1 >= ctx->args.len) {
+                printf("Expected output path\n");
+                exit(-1);
             }
+            //get next arg
+            string arg = ctx->args.at[_index + 1];
+            _index++;
+            if (arg.raw[0] == '-') {
+                printf("Expected output path\n");
+                exit(-1);
+            }
+            ctx->output_path =arg; 
             continue;
+        }        
+
+        //get first 2 chars of arg to see if its an include
+        string new_arg = *arg;
+        new_arg.len = 2;
+        if (string_eq(new_arg, constr("-I"))) {
+            //we've got an include path!
+            if (arg->len == 2) {
+                //we do something... sinister
+                if (_index + 1 >= ctx->args.len) {
+                    printf("Expected include path\n");
+                    exit(-1);
+                }
+                _index++;
+                vec_append(&ctx->include_paths, ctx->args.at[_index]);
+                continue;                
+            }
+
+            string path = string_make(arg->raw + 2, arg->len - 2);
+            vec_append(&ctx->include_paths, path);
+            continue;
+        }
+
+        //scan end of this string to see if its .c
+        new_arg = *arg;
+        new_arg.raw = new_arg.raw + arg->len - 2;
+        new_arg.len = 2;
+        if (string_eq(new_arg, constr(".c"))) {
+            //we've got a file name
+            ctx->curr_file = *arg;
         }
     }
 }

@@ -45,3 +45,19 @@ void _vec_shrink(_VecGeneric* v, size_t stride) {
     v->at = realloc(v->at, v->len * stride);
     v->cap = v->len;
 }
+
+void _vec_remove(_VecGeneric* v, size_t stride, size_t index) {
+    if (v->len < index) return;
+
+    //we move everything above down
+    memmove(v->at + index * stride, v->at + (index + 1) * stride, stride * (v->len - index - 1));
+    v->len--;
+}
+
+void _vec_insert_space(_VecGeneric* v, size_t stride, size_t index) {
+    //we expand if needed
+    _vec_expand_if_necessary(v, stride);
+    v->len++;
+    //then, we insert a space at the index, after moving all elements up by one
+    memmove(v->at + (index + 1) * stride, v->at + index * stride, stride * (v->len - index - 1));
+}
