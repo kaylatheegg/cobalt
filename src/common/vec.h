@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 
-#define Vec(type) _Vec_##type
+#define Vec(type) _Vec_##type 
 #define VecPtr(type) _VecPtr_##type
 #define Vec_typedef(type) typedef struct Vec(type) { \
     type * at; \
@@ -36,7 +36,7 @@ void _vec_insert_space(_VecGeneric* v, size_t stride, size_t index);
 
 #define vec_stride(v) sizeof(*(v)->at)
 #define vec_new(type, initial_cap) (*(Vec(type)*) _vec_new(sizeof(type), initial_cap))
-#define vecptr_new(type, initial_cap) (*(VecPtr(type)*) _vec_new(sizeof(type), initial_cap))
+#define vecptr_new(type, initial_cap) (*(VecPtr(type)*) _vec_new(sizeof(type*), initial_cap))
 
 #define vec_init(v, initial_cap) _vec_init((_VecGeneric*)v, vec_stride(v), initial_cap)
 

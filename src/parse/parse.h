@@ -90,23 +90,28 @@ typedef struct {
 
 Vec_typedef(token);
 
-typedef struct _parser_ctx {
-    Vec(token) tokens;
-    size_t curr_offset;
-    size_t curr_line;
-    Vec(string) logical_lines;
-    cobalt_ctx* ctx;
-    Vec(string) included_files;
-} parser_ctx;
+Vec_typedef(_Vec_token);
+
 
 typedef struct {
     bool is_function;
+    bool is_variadic;
     Vec(token) arguments;
     Vec(token) replacement_list;
     token name;
 } macro_define;
 
 Vec_typedef(macro_define);
+
+typedef struct _parser_ctx {
+    Vec(token) tokens;
+    size_t curr_offset;
+    size_t curr_line;
+    Vec(string) logical_lines;
+    cobalt_ctx* ctx;
+    Vec(string) pragma_files;
+    Vec(macro_define) defines;
+} parser_ctx;
 
 int parse_file(cobalt_ctx* ctx, bool is_include);
 
@@ -119,3 +124,4 @@ void print_token_stream(parser_ctx* ctx);
 
 void print_lexing_error(parser_ctx* ctx, char* format, ...);
 void print_parsing_error(parser_ctx* ctx, token err_tok, char* format, ...);
+void print_parsing_warning(parser_ctx* ctx, token err_tok, char* format, ...);

@@ -6,3 +6,5 @@
 *.so
 build/
 cobalt
+*.sublime-project
+*.sublime-workspace

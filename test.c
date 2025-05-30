@@ -1,6 +1,7 @@
-#define XYZ xyz
-#define ABC"123"
+#define test(a) a + 1
 
-XYZ ABC
+#define meow(a, b, ...) a, b, __VA_ARGS__
 
-#include "src/main.c"
+test(1)
+
+meow(1, 2, 3)
