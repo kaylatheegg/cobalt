@@ -851,7 +851,7 @@ int parser_phase3(parser_ctx* ctx) {
                         if (pp_scan_number(ctx) != 0) return -1;
                         continue;
                     }
-                    print_lexing_error(ctx, "encountered unexpected char %c when lexing %d:%d", line->raw[ctx->curr_offset], _index + 1, ctx->curr_offset + 1);
+                    print_lexing_error(ctx, "encountered unexpected char %c", line->raw[ctx->curr_offset], _index + 1, ctx->curr_offset + 1);
                     return -1;
             }
         }
