@@ -340,7 +340,7 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
         //we're doing some non-standard jank here, since nested Vec isnt possible with current
         //orbit vec.
         
-        //TODO: handle when args are missing, but commas are there. basically, create and insert a nothing token on the same line
+        //FIXME?: handle when args are missing, but commas are there. basically, create and insert a nothing token on the same line
         Vec(_Vec_token) args = vec_new(Vec(token), 1);
         tok_cursor++;
         Vec(token) arg_list = vec_new(token, 1);
@@ -350,6 +350,7 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
                 continue;
             }
             if (ctx->tokens.at[tok_cursor].itype == CTOK_CLOSE_PAREN) {
+                //if args are empty, we simply dont care.
                 vec_append(&args, arg_list);
                 break;
             }
@@ -360,6 +361,15 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
                     //this COULD be a warning, but we're gonna error instead.
                     print_parsing_error(ctx, ctx->tokens.at[tok_cursor + 1], "unexpected ) found");
                     return -1;
+                }
+                if (arg_list.len == 0) {
+                    //we need to create a "nothing" token here, so that we can insert an empty something there
+                    string fake_str = string_alloc(1);
+                    fake_str.len = 0;
+                    token fake_tok = (token){.type = TOK_WHITESPACE,
+                                             .tok = fake_str,
+                                             .line = ctx->tokens.at[tok_cursor].line};
+                    vec_append(&arg_list, fake_tok);
                 }
                 vec_append(&args, arg_list);
                 arg_list = vec_new(token, 1);
