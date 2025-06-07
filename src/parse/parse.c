@@ -335,9 +335,8 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
     } else {
         //we scan ahead until we hit (, and then we grab the arguments
         size_t tok_cursor = index;
-        for (; tok_cursor < ctx->tokens.len; tok_cursor++) {
-            if (ctx->tokens.at[tok_cursor].itype == CTOK_OPEN_PAREN) break;
-        }
+        if (ctx->tokens.at[tok_cursor].type == TOK_WHITESPACE) tok_cursor++;
+        if (ctx->tokens.at[tok_cursor].itype != CTOK_OPEN_PAREN) return 0;
         //we're doing some non-standard jank here, since nested Vec isnt possible with current
         //orbit vec.
         

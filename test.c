@@ -2,8 +2,7 @@
 
 #define meow(a, b, ...) a, b, __VA_ARGS__
 
-meow /@
-
+meow
 
 test(1)
 
