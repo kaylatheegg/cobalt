@@ -11,9 +11,6 @@ ECHO = echo
 
 ifeq ($(OS),Windows_NT)
 	EXECUTABLE_NAME = $(EXECUTABLE_NAME).exe
-else
-	ECHO = /usr/bin/echo
-	# JANK FIX FOR SANDWICH'S DUMB ECHO ON HIS LINUX MACHINE
 endif
 
 CC = gcc

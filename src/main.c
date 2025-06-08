@@ -3,6 +3,8 @@
 #include "parse/parse.h"
 
 void parse_args(cobalt_ctx* ctx);
+void display_help();
+
 
 int main(int argc, char* argv[]) {
     cobalt_ctx ctx = {.output_path = constr(""),
@@ -22,7 +24,7 @@ int main(int argc, char* argv[]) {
     vec_append(&ctx.include_paths, constr("/usr/include/"));
     vec_append(&ctx.include_paths, constr("/usr/include/linux/"));
     if (ctx.curr_file.len == 0) {
-        printf("expected file\n");
+        display_help();
         return -1;
     }
 
@@ -39,6 +41,15 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
+void display_help() {
+    printf("Usage: ./cobalt filename.c -o filename\n");
+    printf("Cobalt C Compiler options:\n");
+    printf("\t -o <filename>:     Specify an output filename\n");
+    printf("\t -I <path>:         Specify an include path that is searched before the system defaults\n");
+    printf("\t -nocol:            Disables ansi escape sequences during printing\n");
+    return;
+}
+
 void parse_args(cobalt_ctx* ctx) {
     for_vec(string* arg, &ctx->args) {
         if (string_eq(*arg, constr("-nocol"))) {
@@ -47,14 +58,14 @@ void parse_args(cobalt_ctx* ctx) {
         if (string_eq(*arg, constr("-o"))) {
             //we've got an output path
             if (_index + 1 >= ctx->args.len) {
-                printf("Expected output path\n");
+                display_help();
                 exit(-1);
             }
             //get next arg
             string arg = ctx->args.at[_index + 1];
             _index++;
             if (arg.raw[0] == '-') {
-                printf("Expected output path\n");
+                display_help();
                 exit(-1);
             }
             ctx->output_path =arg; 
@@ -69,7 +80,7 @@ void parse_args(cobalt_ctx* ctx) {
             if (arg->len == 2) {
                 //we do something... sinister
                 if (_index + 1 >= ctx->args.len) {
-                    printf("Expected include path\n");
+                    display_help();
                     exit(-1);
                 }
                 _index++;
