@@ -865,3 +865,7 @@ int parser_phase3(parser_ctx* ctx) {
 
     return 0;
 }
+
+bool is_c_token(string str) {
+    return false;
+}

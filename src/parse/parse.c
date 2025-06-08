@@ -345,6 +345,8 @@ string pp_stringize_token_stream(Vec(token) stream) {
     return builder;
 }
 
+TODO: fix the bugs that stop macrojank building
+
 int pp_replace_ident(parser_ctx* ctx, size_t index) {
     //scan macro defines list, if macro is defined we can cut it off
     if (index > ctx->tokens.len) crash("Attempted to replace identifier thats not in the ctx->tokens list!\n");
@@ -355,12 +357,14 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
 
     token replaced_tok = ctx->tokens.at[index];
     printf("attempting replacement on token: "str_fmt"\n", str_arg(replaced_tok.tok));
+    print_token_stream(ctx);
 
     //find the correct macro
     for_vec(macro_define* define, &ctx->defines) {
         if (string_eq(replaced_tok.tok, define->name.tok)) {
             found_define = true;
             potential_define = *define;
+            break;
         }
     }
 
@@ -392,7 +396,6 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
         size_t curr_depth = 0;
         for (; tok_cursor < ctx->tokens.len; tok_cursor++) {
             if (ctx->tokens.at[tok_cursor].itype == CTOK_OPEN_PAREN) {
-                tok_cursor++;
                 curr_depth++;
                 continue;
             }
@@ -400,7 +403,6 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
             if (ctx->tokens.at[tok_cursor].itype == CTOK_CLOSE_PAREN) {
                 if (curr_depth != 0) {
                     curr_depth--;
-                    tok_cursor++;
                     continue;
                 }
                 //if args are empty, we skip appending.
@@ -427,9 +429,15 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
                                              .line = ctx->tokens.at[tok_cursor].line};
                     vec_append(&arg_list, fake_tok);
                 }
+                if (potential_define.is_variadic && args.len == potential_define.arguments.len - 1) {
+                    //we safely ignore this comma.
+                    vec_append(&arg_list, ctx->tokens.at[tok_cursor]);
+                    continue;
+                }
+
                 vec_append(&args, arg_list);
                 arg_list = vec_new(token, 1);
-                tok_cursor++;
+                if (ctx->tokens.at[tok_cursor].type == TOK_WHITESPACE) tok_cursor++;
                 continue;
             }
             vec_append(&arg_list, ctx->tokens.at[tok_cursor]);
@@ -442,7 +450,6 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
             print_parsing_error(ctx, replaced_tok, "macro "str_fmt" takes %d args, given %d", str_arg(replaced_tok.tok), potential_define.arguments.len, args.len);
             return -1;
         }
-        //TODO: fix recursive expansion breaking on wrong arg count
 
         if (potential_define.is_variadic) {
             //we need to count the number of args, and if they're less than the minimum required, we error
@@ -464,150 +471,196 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
         //now that we know everything is fine, we can start inserting
         //we split this into two paths, function and var function
 
-        if (!potential_define.is_variadic) {
-            //index contains the name of the macro we started at, so we can just start replacing here
-            //we need to recursively expand macros internally, which is going to get.. messy
-            //so while we're scanning the replacement list, once we've replaced, we then check to see if we need to run pp_replace_ident
-            //we now remove tokens until we hit the final close paren
-            size_t curr_depth = 0;
-            //we delete the identifier
-            for (; index < ctx->tokens.len;) {
-                if (ctx->tokens.at[index].itype == CTOK_OPEN_PAREN) {
-                    vec_remove(&ctx->tokens, index);
-                    curr_depth++;
-                    continue;
-                }
+        //index contains the name of the macro we started at, so we can just start replacing here
+        //we need to recursively expand macros internally, which is going to get.. messy
+        //so while we're scanning the replacement list, once we've replaced, we then check to see if we need to run pp_replace_ident
+        //we now remove tokens until we hit the final close paren
+        curr_depth = 0;
+        //we delete the identifier
+        for (; index < ctx->tokens.len;) {
+            if (ctx->tokens.at[index].itype == CTOK_OPEN_PAREN) {
+                vec_remove(&ctx->tokens, index);
+                curr_depth++;
+                continue;
+            }
 
-                if (ctx->tokens.at[index].itype == CTOK_CLOSE_PAREN) {
-                    if (curr_depth != 1) {
-                        curr_depth--;
-                        vec_remove(&ctx->tokens, index);
-                        continue;
-                    }
+            if (ctx->tokens.at[index].itype == CTOK_CLOSE_PAREN) {
+                if (curr_depth != 1) {
+                    curr_depth--;
                     vec_remove(&ctx->tokens, index);
-                    break;
+                    continue;
                 }
                 vec_remove(&ctx->tokens, index);
+                break;
             }
+            vec_remove(&ctx->tokens, index);
+        }
 
-            //we've deleted the macro, now we need to fill it back out with info
-            //first, we shove the replacement list into a special vec.
-            Vec(token) replacement_list = vec_new(token, 1);
-            for_vec(token* tok, &potential_define.replacement_list) {
-                token new_tok = *tok;
-                new_tok.line = replaced_tok.line;
-                vec_append(&replacement_list, new_tok);
-            }
+        //we've deleted the macro, now we need to fill it back out with info
+        //first, we shove the replacement list into a special vec.
+        Vec(token) replacement_list = vec_new(token, 1);
+        for_vec(token* tok, &potential_define.replacement_list) {
+            token new_tok = *tok;
+            new_tok.line = replaced_tok.line;
+            vec_append(&replacement_list, new_tok);
+        }
 
-            //now, scan the replacement list. if we find a #, we need to deal with it
-            for_vec(token* tok, &replacement_list) {
-                printf("handling token: "str_fmt"\n", str_arg(tok->tok));
-                if (tok->itype == CTOK_HASH) {
-                    //stringise the whole thing that comes next
-                    //first, is it an argument?
-                    _index++;
-                    if (_index > replacement_list.len) break;
-                    //is arg[i] == next token?
-                    for (size_t i = 0; i < potential_define.arguments.len; i++) {
-                        if (string_eq(potential_define.arguments.at[i].tok, replacement_list.at[_index].tok)) {
-                            //we have an argument. get the index, and then stringize the whole token sequence
-                            Vec(token) arg_tokens = args.at[i];
-                            string stringised = pp_stringize_token_stream(arg_tokens);
-                            //now we have the stringised stream, we need to create a new token
-                            token str_tok = (token){.type = PPTOK_STR_LIT,
-                                                    .tok = stringised,
-                                                    .line = replaced_tok.line,
-                                                    .from_macro_param = true};
-                            vec_insert(&replacement_list, _index - 1, str_tok);
-                            //we delete the two tokens that caused this
-                            vec_remove(&replacement_list, _index);
-                            vec_remove(&replacement_list, _index);
-                            
-                            _index--;
-                            break;
-                        }
-                    }
-                    continue;
-                }
-            }
-
-            //then, we scan again, looking for identifiers to replace.
-            for_vec(token* tok, &replacement_list) {
-                if (tok->type == PPTOK_IDENTIFIER) {
-                    //this COULD be an argument. if it is, we replace it. otherwise, we just insert a normal token
-                    if (_index > replacement_list.len) break;
-                    bool been_replaced = false;
-                    //is arg[i] == next token?
-                    for (size_t i = 0; i < potential_define.arguments.len; i++) {
-                        if (string_eq(potential_define.arguments.at[i].tok, tok->tok)) {
-                            //we have an argument. get the index, and then repeatedly insert.
-                            Vec(token) arg_tokens = args.at[i];
-                            for (size_t j = 0; j < arg_tokens.len; j++) {
-                                token inserted_tok = arg_tokens.at[j];
-                                inserted_tok.from_macro_param = true;
-                                //remove the identifier that caused this
-                                printf("removing "str_fmt"\n", str_arg(replacement_list.at[_index].tok));
-                                vec_remove(&replacement_list, _index);
-                                vec_insert(&replacement_list, j + _index, inserted_tok);
-                                printf("inserting "str_fmt" at %d\n", str_arg(inserted_tok.tok), _index + j);
-                            }
-                            been_replaced = true;
-                            break;
-                        }
-                    }
-                    continue;
-                }
-            }
-            //now, we process concatenations
-            for_vec(token* tok, &replacement_list) {
-                if (tok->itype == CTOK_HASH_HASH) {
-                    if (_index > 0 && _index + 1 < replacement_list.len) {
-                        //we can now merge the two strings
-                        token prev = replacement_list.at[_index - 1];
-                        token next = replacement_list.at[_index + 1];
-                        //delete the 3 tokens around this
-                        vec_remove(&replacement_list, _index);
-                        vec_remove(&replacement_list, _index);
-                        vec_remove(&replacement_list, _index - 1);
-                        //we insert from _index - 1
-                        //this will be tricky, since we need to detect that this is a valid symbol, and assign it an itype and a type.
-                        //for now, we ignore these.
-                        printf("TODO: handle concat symbol values\n");
-                        token new_tok = (token){.tok = string_concat(prev.tok, next.tok),
+        //now, scan the replacement list. if we find a #, we need to deal with it
+        for_vec(token* tok, &replacement_list) {
+            //printf("handling token: "str_fmt"\n", str_arg(tok->tok));
+            if (tok->itype == CTOK_HASH) {
+                //stringise the whole thing that comes next
+                //first, is it an argument?
+                _index++;
+                if (_index > replacement_list.len) break;
+                //is arg[i] == next token?
+                for (size_t i = 0; i < potential_define.arguments.len; i++) {
+                    if (string_eq(potential_define.arguments.at[i].tok, replacement_list.at[_index].tok)) {
+                        //we have an argument. get the index, and then stringize the whole token sequence
+                        Vec(token) arg_tokens = args.at[i];
+                        string stringised = pp_stringize_token_stream(arg_tokens);
+                        //now we have the stringised stream, we need to create a new token
+                        token str_tok = (token){.type = PPTOK_STR_LIT,
+                                                .tok = stringised,
                                                 .line = replaced_tok.line,
-                                                .from_macro_param = false};
-                        vec_insert(&replacement_list, _index - 1, new_tok);
-                        continue;
+                                                .from_macro_param = true};
+                        vec_insert(&replacement_list, _index - 1, str_tok);
+                        //we delete the two tokens that caused this
+                        vec_remove(&replacement_list, _index);
+                        vec_remove(&replacement_list, _index);
+                        
+                        _index--;
+                        break;
                     }
                 }
+                continue;
             }
+        }
 
-            //we can now expand tokens that originated from this process, by creating a fake pctx
-            for_vec(token* tok, &replacement_list) {
-                parser_ctx temp_ctx = {.tokens = replacement_list,
-                                       .logical_lines = ctx->logical_lines,
-                                       .ctx = ctx->ctx,
-                                       .defines = ctx->defines};
-                if (tok->type == PPTOK_IDENTIFIER && tok->from_macro_param == true) {
-                    pp_replace_ident(&temp_ctx, _index);
+        //then, we scan again, looking for identifiers to replace.
+        for_vec(token* tok, &replacement_list) {
+            //printf("rl size: %d\n", replacement_list.len);
+            if (tok->type == PPTOK_IDENTIFIER) {
+                //this COULD be an argument. if it is, we replace it. otherwise, we just insert a normal token
+                if (_index > replacement_list.len) break;
+                //is arg[i] == next token?
+                for (size_t i = 0; i < potential_define.arguments.len; i++) {
+                    if (string_eq(potential_define.arguments.at[i].tok, tok->tok) && tok->from_macro_param == false) {
+                        //we have an argument. get the index, and then repeatedly insert.
+                        Vec(token) arg_tokens = args.at[i];
+                        //remove the identifier that caused this
+                        printf("removing "str_fmt"\n", str_arg(replacement_list.at[_index].tok));
+                        vec_remove(&replacement_list, _index);
+
+                        for (size_t j = 0; j < arg_tokens.len; j++) {
+                            token inserted_tok = arg_tokens.at[j];
+                            inserted_tok.from_macro_param = true;
+                            vec_insert(&replacement_list, j + _index, inserted_tok);
+                            printf("inserting "str_fmt" at %d\n", str_arg(inserted_tok.tok), _index + j);
+                        }
+                        break;
+                    }
+
+                    else if (string_eq(tok->tok, constr("__VA_ARGS__"))) {
+                        //we've got __VA_ARGS__
+                        //go to the last argument in the args list, and start replacing
+                        Vec(token) arg_tokens = args.at[args.len - 1];
+
+                        //printf("removing "str_fmt"\n", str_arg(replacement_list.at[_index].tok));
+                        vec_remove(&replacement_list, _index);  
+
+                        for (size_t j = 0; j < arg_tokens.len; j++) {
+                            token inserted_tok = arg_tokens.at[j];
+                            inserted_tok.from_macro_param = true;
+                            vec_insert(&replacement_list, j + _index, inserted_tok);
+                            //printf("inserting "str_fmt" at %d\n", str_arg(inserted_tok.tok), _index + j);
+                        }
+                        break;                        
+                    }
+                    else if (string_eq(tok->tok, constr("__VA_OPT__"))) {
+                        print_parsing_error(ctx, *tok, "__VA_OPT__ not supported");
+                        return -1;
+                    }
+                }
+                continue;
+            }
+        }
+        //now, we process concatenations
+        for_vec(token* tok, &replacement_list) {
+            if (tok->itype == CTOK_HASH_HASH) {
+                if (_index > 0 && _index + 1 < replacement_list.len) {
+                    //we can now merge the two strings
+                    token prev = replacement_list.at[_index - 1];
+                    token next = replacement_list.at[_index + 1];
+                    //delete the 3 tokens around this
+                    vec_remove(&replacement_list, _index);
+                    vec_remove(&replacement_list, _index);
+                    vec_remove(&replacement_list, _index - 1);
+                    //we insert from _index - 1
+                    //this will be tricky, since we need to detect that this is a valid symbol, and assign it an itype and a type.
+                    //for now, we ignore these.
+                    //lord, forgive me for what i'm about to do.
+                    //since we dont have a consumption parser, we cant throw arbitrary tokens at something to verify their type.
+                    //we instead need to fake a lexing step, so we pass a rudimentary context into phase 3, and then steal the
+                    //token back at the end.
+                    parser_ctx fake_ctx = {.logical_lines = vec_new(string, 1),
+                                           .ctx = ctx->ctx,
+                                           .tokens = vec_new(token, 1)};
+                    vec_append(&fake_ctx.logical_lines, string_concat(prev.tok, next.tok));
+
+                    parser_phase3(&fake_ctx);
+                    //steal the token back. we maintain ownership either way
+                    token stolen_tok = fake_ctx.tokens.at[0];
+
+                    token new_tok = (token){.tok = stolen_tok.tok,
+                                            .type = stolen_tok.type,
+                                            .itype = stolen_tok.itype,
+                                            .line = replaced_tok.line,
+                                            .from_macro_param = false};
+                    vec_insert(&replacement_list, _index - 1, new_tok);
+                    continue;
                 }
             }
+        }
 
-            //finally, we put our replacement list into the source
-            for_vec(token* tok, &replacement_list) {
-                vec_insert(&ctx->tokens, index + _index, *tok);
+        //we can now expand tokens that originated from this process, by creating a fake pctx
+        //we scan left to right to do this
+        for_vec(token* tok, &replacement_list) {
+            parser_ctx temp_ctx = {.tokens = replacement_list,
+                                   .logical_lines = ctx->logical_lines,
+                                   .ctx = ctx->ctx,
+                                   .defines = ctx->defines};
+            if (tok->type == PPTOK_IDENTIFIER && tok->from_macro_param == true) {
+                pp_replace_ident(&temp_ctx, _index);
+                //we need to update replacement_list's len info, since it got destroyed during recursive replacement
+                //this is a dead simple fix.
+                //i also dont know why this fixes the bug. but it does. so w/e.
+                replacement_list.len = temp_ctx.tokens.len;
             }
-
-            print_token_stream(ctx);
-            //return -1;
-
         }
 
-        if (potential_define.is_variadic) {
-            print_parsing_error(ctx, replaced_tok, "TODO: variadic macros");
-            return -1;
+        //now, we can expand any OTHER tokens.
+        for_vec_bw(token* tok, &replacement_list) {
+            printf("checking: "str_fmt"\n", str_arg(tok->tok));
+            parser_ctx temp_ctx = {.tokens = replacement_list,
+                                   .logical_lines = ctx->logical_lines,
+                                   .ctx = ctx->ctx,
+                                   .defines = ctx->defines};
+            if (tok->type == PPTOK_IDENTIFIER) {
+                pp_replace_ident(&temp_ctx, _index - 1);
+                //we need to update replacement_list's len info, since it got destroyed during recursive replacement
+                replacement_list.len = temp_ctx.tokens.len;
+            }                
         }
 
+        //finally, we put our replacement list into the source
+        for_vec(token* tok, &replacement_list) {
+            //printf("inserting: "str_fmt"\n", str_arg(tok->tok));
+            vec_insert(&ctx->tokens, index + _index, *tok);
+        }
+
+        print_token_stream(ctx);
+        //return -1;
 
     }
     return 0;

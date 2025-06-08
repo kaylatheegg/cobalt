@@ -29,3 +29,6 @@ To run it, type `./cobalt filename`. Currently, the documentation is a little...
 
 ## Known issues
 - Do not attempt to build with files that cyclically include eachother with include guards, as cobalt does not yet support #ifdef.
+
+## TODO
+- Make the lexer a "maximal token" consumption parser, rather than pretending C tokens are terminals in a Type 3 grammar with a recdec parser. This fixes a hack in preprocessing concat handling.

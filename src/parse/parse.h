@@ -123,6 +123,8 @@ int parser_phase4(parser_ctx* ctx);
 
 void print_token_stream(parser_ctx* ctx);
 
+#define pp_stream(tokens) print_token_stream(&(token){.tokens = (tokens)})
+
 void print_lexing_error(parser_ctx* ctx, char* format, ...);
 void print_parsing_error(parser_ctx* ctx, token err_tok, char* format, ...);
 void print_parsing_warning(parser_ctx* ctx, token err_tok, char* format, ...);
