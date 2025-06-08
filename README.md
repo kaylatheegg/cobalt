@@ -2,6 +2,8 @@
 cobalt is a (hopefully) C23 conformant C compiler, powered by the [Iron Target Independent Code Generator](https://github.com/spsandwichman/coyote) (currently part of the coyote compiler).
 Currently, it is up to translation phase 3, with the start of work on phase 4.
 
+I am working from the [n3320](https://www.open-std.org/jtc1/sc22/wg14/www/docs/n3220.pdf) revision of the standard, which is the newest free version.
+
 ## Building
 ### Prerequisites
 You need a C compiler that supports GNU extensions (like gcc) and C23 (so no TCC! sorry...). 
