@@ -86,6 +86,7 @@ typedef struct {
     u32 line;
     bool was_included;
     string included_from;
+    bool from_macro_param;
 } token;
 
 Vec_typedef(token);
