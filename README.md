@@ -12,7 +12,17 @@ To build cobalt, first clone it, and then in the root of the repo, type
 make clean
 ```
 This creates the dependency file structure (this is a MASSIVE hack, and if you have a better solution please open an issue or PR!)
-Then, to build, you can either use `make debug`, or `make build`. Debug disables optimisations, enables debug info, and links a performance analyser.
+
+Then, to build, you can either use 
+```shell 
+make debug 
+``` 
+OR 
+```shell 
+make build
+``` 
+Debug disables optimisations, enables debug info, and links a performance analyser.
+
 To run it, type `./cobalt filename`. Currently, the documentation is a little... sparse, so if you have any questions feel free to open an issue or contact me.
 
 ## Known issues

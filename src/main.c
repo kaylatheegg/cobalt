@@ -47,6 +47,7 @@ void display_help() {
     printf("\t -o <filename>:     Specify an output filename\n");
     printf("\t -I <path>:         Specify an include path that is searched before the system defaults\n");
     printf("\t -nocol:            Disables ansi escape sequences during printing\n");
+    printf("\t -h:                Prints this help info\n");
     return;
 }
 
@@ -55,6 +56,7 @@ void parse_args(cobalt_ctx* ctx) {
         if (string_eq(*arg, constr("-nocol"))) {
             ctx->no_colour = true;
         }
+
         if (string_eq(*arg, constr("-o"))) {
             //we've got an output path
             if (_index + 1 >= ctx->args.len) {
@@ -71,6 +73,12 @@ void parse_args(cobalt_ctx* ctx) {
             ctx->output_path =arg; 
             continue;
         }        
+
+        if (string_eq(*arg, constr("-h"))) {
+            display_help();
+            exit(-1);
+        }
+
 
         //get first 2 chars of arg to see if its an include
         string new_arg = *arg;
