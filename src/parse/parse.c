@@ -346,7 +346,7 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
     if (index > ctx->tokens.len) crash("Attempted to replace identifier thats not in the ctx->tokens list!\n");
     if (ctx->tokens.at[index].type != PPTOK_IDENTIFIER) crash("Attempted to replace non-identifier! Got: %s\n", token_str[ctx->tokens.at[index].type]);
     //we need to recursively call pp_replace_ident for any identifiers that do NOT match this one
-    macro_define potential_define;
+    macro_define potential_define = {};
     bool found_define = false;
 
     token replaced_tok = ctx->tokens.at[index];
@@ -706,6 +706,7 @@ int parser_phase4(parser_ctx* ctx) {
             //first, check for ws
             if (curr_token().type == TOK_WHITESPACE) _index++;
             if (string_eq(curr_token().tok, constr("include"))) {
+                return -1;
                 //we've got an include!
                 //now, we need to skip the whitespace, and get onto the include.
                 _index+=2;

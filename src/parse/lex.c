@@ -319,13 +319,14 @@ int parser_phase3(parser_ctx* ctx) {
             }
             switch (CURR_CHAR) {
                 case ' ':
+                case '\f': //FIXME?: is this right?
                 case '\t':
                 case '\r':
                 case '\n': {
                     //we need to emit a whitespace "token", because the c standard is stupid.
                     size_t start_offset = ctx->curr_offset;
                     for (; ctx->curr_offset < line->len; ctx->curr_offset++) {
-                        if (CURR_CHAR != ' ' && CURR_CHAR != '\t' && CURR_CHAR != '\n' && CURR_CHAR != '\r') break;
+                        if (CURR_CHAR != ' ' && CURR_CHAR != '\t' && CURR_CHAR != '\n' && CURR_CHAR != '\r' && CURR_CHAR != '\f') break;
                     }
                     ctx->curr_offset--;
                     token new_tok = (token){.type = TOK_WHITESPACE,
