@@ -112,6 +112,7 @@ typedef struct _parser_ctx {
     cobalt_ctx* ctx;
     Vec(string) pragma_files;
     Vec(macro_define) defines;
+    token curr_macro_name;
 } parser_ctx;
 
 int parse_file(cobalt_ctx* ctx, bool is_include);
@@ -123,7 +124,7 @@ int parser_phase4(parser_ctx* ctx);
 
 void print_token_stream(parser_ctx* ctx);
 
-#define pp_stream(tokens) print_token_stream(&(token){.tokens = (tokens)})
+#define pp_stream(tok) print_token_stream(&(parser_ctx){.tokens = (tok)})
 
 void print_lexing_error(parser_ctx* ctx, char* format, ...);
 void print_parsing_error(parser_ctx* ctx, token err_tok, char* format, ...);

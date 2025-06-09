@@ -74,5 +74,8 @@
 #define MRETURN(...) struct {EVAL(MAP(_MRETURN_IMPL, __VA_ARGS__))}
 
 #define _MRETURN_IMPL(x) x;
-
+  
 MRETURN(int x, int y);
+
+//#define cat(a, b) a ## b 
+//cat(123, 456)
