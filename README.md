@@ -28,7 +28,8 @@ Debug disables optimisations, enables debug info, and links a performance analys
 To run it, type `./cobalt filename`. Currently, the documentation is a little... sparse, so if you have any questions feel free to open an issue or contact me.
 
 ## Known issues
-- Do not attempt to build with files that cyclically include eachother with include guards, as cobalt does not yet support #ifdef.
+- Functional macros haven't been battle tested, so there are likely many edge cases still present.
+- The #ifdef family of directives are not yet implemented, and #if is likely to have to wait until phase 7 starts.
 
 ## TODO
 - Make the lexer a "maximal token" consumption parser, rather than pretending C tokens are terminals in a Type 3 grammar with a recdec parser. This fixes a hack in preprocessing concat handling.
