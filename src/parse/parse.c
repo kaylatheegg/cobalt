@@ -342,9 +342,7 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
     //we need to recursively call pp_replace_ident for any identifiers that do NOT match this one
     macro_define potential_define = {};
     bool found_define = false;
-
-    printf("expanding "str_fmt"\n", str_arg(ctx->tokens.at[index].tok));
-    print_token_stream(ctx);    
+  
     token replaced_tok = ctx->tokens.at[index];
 
     //find the correct macro
@@ -373,12 +371,7 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
         size_t tok_cursor = index;
         tok_cursor++; //skip identifier
         //printf("%d, %d\n", tok_cursor, ctx->tokens.len);
-        if (tok_cursor >= ctx->tokens.len) {
-            printf("%d, %d\n", tok_cursor, ctx->tokens.len);
-        
-            printf("encountered oob tok_cursor when parsing args for "str_fmt"\n", str_arg(replaced_tok.tok));
-            return 0;
-        }
+        if (tok_cursor >= ctx->tokens.len) return 0; //already invalid, but this isn't ICE worthy.
         if (ctx->tokens.at[tok_cursor].type == TOK_WHITESPACE) tok_cursor++;
         if (ctx->tokens.at[tok_cursor].itype != CTOK_OPEN_PAREN) return 0;
         //we're doing some non-standard jank here, since nested Vec isnt possible with current
@@ -717,7 +710,40 @@ int parser_phase4(parser_ctx* ctx) {
             //next, scan for the type
             //first, check for ws
             if (curr_token().type == TOK_WHITESPACE) _index++;
-            if (string_eq(curr_token().tok, constr("include"))) {
+            //if group:
+            if (string_eq(curr_token().tok, constr("if"))) {
+                print_parsing_error(ctx, curr_token(), "TODO: if (once constant expressions are done)");
+                return -1;
+            } else if (string_eq(curr_token().tok, constr("ifdef"))) {
+                print_parsing_error(ctx, curr_token(), "TODO: ifdef");
+                return -1;
+            } else if (string_eq(curr_token().tok, constr("ifndef"))) {
+                print_parsing_error(ctx, curr_token(), "TODO: ifndef");
+                return -1;
+            }
+            //elif group:
+            else if (string_eq(curr_token().tok, constr("elif"))) {
+                print_parsing_error(ctx, curr_token(), "TODO: elif");
+                return -1;
+            } else if (string_eq(curr_token().tok, constr("elifdef"))) {
+                print_parsing_error(ctx, curr_token(), "TODO: elifdef");
+                return -1;
+            } else if (string_eq(curr_token().tok, constr("elifndef"))) {
+                print_parsing_error(ctx, curr_token(), "TODO: elifndef");
+                return -1;
+            }
+            //else group:
+            else if (string_eq(curr_token().tok, constr("else"))) {
+                print_parsing_error(ctx, curr_token(), "TODO: else");
+                return -1;
+            }
+            //endif group:
+            else if (string_eq(curr_token().tok, constr("endif"))) {
+                print_parsing_error(ctx, curr_token(), "TODO: endif");
+                return -1;
+            }
+            //control line:
+            else if (string_eq(curr_token().tok, constr("include"))) {
                 //we've got an include!
                 //now, we need to skip the whitespace, and get onto the include.
                 _index+=2;
@@ -997,10 +1023,11 @@ int parser_phase4(parser_ctx* ctx) {
                 if (tok->line != ctx->tokens.at[directive_end].line) break;
             }
             //we now have the number of tokens to iterate
-            printf("deleting %d tokens\n", directive_end - directive_start);    
+            //printf("deleting %d tokens\n", directive_end - directive_start);    
             for (size_t i = 0; i < (directive_end - directive_start); i++) {
                 vec_remove(&ctx->tokens, _index);
             }
+            _index--;
         }
     }
     return 0;
