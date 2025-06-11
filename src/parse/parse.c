@@ -881,7 +881,7 @@ int parser_phase4(parser_ctx* ctx) {
                 } else {
                     _index++;
                 }
-                if (curr_token().type == TOK_WHITESPACE) _index++;
+                //if (curr_token().type == TOK_WHITESPACE) _index++;
                 
                 if (curr_token().itype == CTOK_OPEN_PAREN) {
                     _index++;
