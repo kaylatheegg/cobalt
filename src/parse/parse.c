@@ -483,8 +483,7 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
         //we split this into two paths, function and var function
 
         //index contains the name of the macro we started at, so we can just start replacing here
-        //we need to recursively expand macros internally, which is going to get.. messy
-        //so while we're scanning the replacement list, once we've replaced, we then check to see if we need to run pp_replace_ident
+        
         //we now remove tokens until we hit the final close paren
         curr_depth = 0;
         //we delete the identifier
@@ -971,10 +970,13 @@ int parser_phase4(parser_ctx* ctx) {
                     vec_append(&new_def.replacement_list, ctx->tokens.at[_index]);
                 }
 
-                //before we finish, we need to get rid of any trailing ws
+                //before we finish, we need to get rid of any trailing or following ws
                 //this should only be one tokens worth
                 if (new_def.replacement_list.at[new_def.replacement_list.len - 1].type == TOK_WHITESPACE) {
                     vec_remove(&new_def.replacement_list, new_def.replacement_list.len - 1);
+                }
+                if (new_def.replacement_list.at[0].type == TOK_WHITESPACE) {
+                    vec_remove(&new_def.replacement_list, 0);
                 }
 
                 _index--; //fix accidental overread
