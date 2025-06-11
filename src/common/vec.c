@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "vec.h"
+#include "crash.h"
 
 _VecGeneric* _vec_new(size_t stride, size_t initial_cap) {
     // store the vec statically so it lives after vec_new has been called, 
@@ -19,6 +20,7 @@ void _vec_init(_VecGeneric* v, size_t stride, size_t initial_cap) {
 }
 
 void _vec_reserve(_VecGeneric* v, size_t stride, size_t slots) {
+    if (v->len > v->cap) crash("%s: v->len > v->cap\n", __func__);
     if (slots + v->len > v->cap) {
         v->cap += slots;
         v->at = realloc(v->at, v->cap * stride);
@@ -26,6 +28,8 @@ void _vec_reserve(_VecGeneric* v, size_t stride, size_t slots) {
 }
 
 void _vec_expand_if_necessary(_VecGeneric* v, size_t stride) {
+    if (v->len > v->cap) crash("%s: v->len > v->cap\n", __func__);
+
     if (v->len + 1 > v->cap) {
         if (v->cap == 1) v->cap++;
         v->cap = (v->cap * 3) / 2;
@@ -34,11 +38,15 @@ void _vec_expand_if_necessary(_VecGeneric* v, size_t stride) {
 }
 
 void _vec_destroy(_VecGeneric* v) {
+    if (v->len > v->cap) crash("%s: v->len > v->cap\n", __func__);
+    
     free(v->at);
     *v = (_VecGeneric){0};
 }
 
 void _vec_shrink(_VecGeneric* v, size_t stride) {
+    if (v->len > v->cap) crash("%s: v->len > v->cap\n", __func__);
+    
     if (v->len == v->cap) {
         return;
     }
@@ -47,6 +55,8 @@ void _vec_shrink(_VecGeneric* v, size_t stride) {
 }
 
 void _vec_remove(_VecGeneric* v, size_t stride, size_t index) {
+    if (v->len > v->cap) crash("%s: v->len > v->cap\n", __func__);
+    
     if (v->len < index) return;
 
     //we move everything above down
@@ -55,6 +65,9 @@ void _vec_remove(_VecGeneric* v, size_t stride, size_t index) {
 }
 
 void _vec_insert_space(_VecGeneric* v, size_t stride, size_t index) {
+    if (v->len > v->cap) crash("%s: v->len > v->cap\n", __func__);
+    
+    if (v->len < index) return;
     //we expand if needed
     _vec_expand_if_necessary(v, stride);
     v->len++;

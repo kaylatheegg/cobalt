@@ -383,6 +383,8 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
         Vec(token) arg_list = vec_new(token, 1);
         size_t curr_depth = 0;
         for (; tok_cursor < ctx->tokens.len; tok_cursor++) {
+            //we're gonna skip ws until the argument starts
+            if (arg_list.len == 0 && ctx->tokens.at[tok_cursor].type == TOK_WHITESPACE) continue;
             //if (ctx->tokens.at[tok_cursor].type == TOK_WHITESPACE) continue;
 
             if (ctx->tokens.at[tok_cursor].itype == CTOK_OPEN_PAREN) {
@@ -469,6 +471,14 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
                 return -1;
             }
         }
+        //we now fix up the end of args, where there could be extra useless ws
+        //this should just be one token's worth in each
+        for_vec(Vec(token)* arg, &args) {
+            if (arg->at[arg->len - 1].type == TOK_WHITESPACE) {
+                vec_remove(arg, arg->len - 1);
+            }
+        }
+
         //now that we know everything is fine, we can start inserting
         //we split this into two paths, function and var function
 
@@ -651,6 +661,7 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
                 //we need to update replacement_list's len info, since it got destroyed during recursive replacement
                 //we also need to grab the ctx's pointer, since it could have changed.
                 replacement_list.len = temp_ctx.tokens.len;
+                replacement_list.cap = temp_ctx.tokens.cap;
                 replacement_list.at = temp_ctx.tokens.at;
             }
         }
@@ -668,6 +679,7 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
                 //we need to update replacement_list's len info, since it got destroyed during recursive replacement
                 //we also need to grab the ctx's pointer, since it could have changed.
                 replacement_list.len = temp_ctx.tokens.len;
+                replacement_list.cap = temp_ctx.tokens.cap;
                 replacement_list.at = temp_ctx.tokens.at;
             }                
         }
@@ -955,9 +967,14 @@ int parser_phase4(parser_ctx* ctx) {
                     if (ctx->tokens.at[_index].type == TOK_WHITESPACE) {
                         //we're gonna cut down the whitespace to just a single character space.
                         ctx->tokens.at[_index].tok.len = 1;
-                        continue;
                     }
                     vec_append(&new_def.replacement_list, ctx->tokens.at[_index]);
+                }
+
+                //before we finish, we need to get rid of any trailing ws
+                //this should only be one tokens worth
+                if (new_def.replacement_list.at[new_def.replacement_list.len - 1].type == TOK_WHITESPACE) {
+                    vec_remove(&new_def.replacement_list, new_def.replacement_list.len - 1);
                 }
 
                 _index--; //fix accidental overread

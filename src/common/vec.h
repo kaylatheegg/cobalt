@@ -63,6 +63,7 @@ void _vec_insert_space(_VecGeneric* v, size_t stride, size_t index);
     for (size_t _index = 0, _keep = 1; _index < (vec)->len; ++_index, _keep = !_keep) \
     for (decl = &(vec)->at[_index]; _keep; _keep = !_keep)
 
+//NOTE: _index does not match the current index in this macro, so be careful when using it!
 #define for_vec_bw(decl, vec) \
     for (size_t _index = (vec)->len, _keep = 1; _index != 0; --_index, _keep = !_keep) \
     for (decl = &(vec)->at[_index - 1]; _keep; _keep = !_keep)
