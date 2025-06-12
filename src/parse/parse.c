@@ -647,7 +647,7 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
         }
 
         //we can now expand tokens that originated from this process, by creating a fake pctx
-        //we scan left to right to do this
+        //we scan right to left to do this
         for_vec_bw(token* tok, &replacement_list) {
             parser_ctx temp_ctx = {.tokens = replacement_list,
                                    .logical_lines = ctx->logical_lines,
@@ -657,11 +657,10 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
             if (tok->type == PPTOK_IDENTIFIER && tok->from_macro_param == true) {
                 if (string_eq(tok->tok, ctx->curr_macro_name.tok)) continue;
                 pp_replace_ident(&temp_ctx, _index - 1);
-                //we need to update replacement_list's len info, since it got destroyed during recursive replacement
-                //we also need to grab the ctx's pointer, since it could have changed.
-                replacement_list.len = temp_ctx.tokens.len;
-                replacement_list.cap = temp_ctx.tokens.cap;
-                replacement_list.at = temp_ctx.tokens.at;
+                //we need to update the replacement list with the temp_ctx's tokens
+                //replacement_list's old at pointer is completely invalid by this point,
+                //so we just need to update it.
+                replacement_list = temp_ctx.tokens;
             }
         }
 
@@ -675,11 +674,11 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
             if (tok->type == PPTOK_IDENTIFIER) {
                 if (string_eq(tok->tok, ctx->curr_macro_name.tok)) continue;
                 pp_replace_ident(&temp_ctx, _index - 1);
-                //we need to update replacement_list's len info, since it got destroyed during recursive replacement
-                //we also need to grab the ctx's pointer, since it could have changed.
-                replacement_list.len = temp_ctx.tokens.len;
-                replacement_list.cap = temp_ctx.tokens.cap;
-                replacement_list.at = temp_ctx.tokens.at;
+            
+                //we need to update the replacement list with the temp_ctx's tokens
+                //replacement_list's old at pointer is completely invalid by this point,
+                //so we just need to update it.
+                replacement_list = temp_ctx.tokens;
             }                
         }
 
@@ -726,6 +725,7 @@ int parser_phase4(parser_ctx* ctx) {
                 print_parsing_error(ctx, curr_token(), "TODO: if (once constant expressions are done)");
                 return -1;
             } else if (string_eq(curr_token().tok, constr("ifdef"))) {
+                
                 print_parsing_error(ctx, curr_token(), "TODO: ifdef");
                 return -1;
             } else if (string_eq(curr_token().tok, constr("ifndef"))) {
