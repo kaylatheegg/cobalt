@@ -378,7 +378,7 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
         //orbit vec.
         
         //FIXME?: handle when args are missing, but commas are there. basically, create and insert a nothing token on the same line
-        Vec(_Vec_token) args = vec_new(Vec(token), 1);
+        Vec(Vec(token)) args = vec_new(Vec(token), 1);
         tok_cursor++;
         Vec(token) arg_list = vec_new(token, 1);
         size_t curr_depth = 0;
@@ -656,7 +656,7 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
                                    .curr_macro_name = *tok};
             if (tok->type == PPTOK_IDENTIFIER && tok->from_macro_param == true) {
                 if (string_eq(tok->tok, ctx->curr_macro_name.tok)) continue;
-                pp_replace_ident(&temp_ctx, _index - 1);
+                if (pp_replace_ident(&temp_ctx, _index - 1) == -1) return -1;
                 //we need to update the replacement list with the temp_ctx's tokens
                 //replacement_list's old at pointer is completely invalid by this point,
                 //so we just need to update it.
@@ -673,7 +673,7 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
                                    .curr_macro_name = *tok};
             if (tok->type == PPTOK_IDENTIFIER) {
                 if (string_eq(tok->tok, ctx->curr_macro_name.tok)) continue;
-                pp_replace_ident(&temp_ctx, _index - 1);
+                if (pp_replace_ident(&temp_ctx, _index - 1) == -1) return -1;
             
                 //we need to update the replacement list with the temp_ctx's tokens
                 //replacement_list's old at pointer is completely invalid by this point,

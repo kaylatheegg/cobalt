@@ -90,6 +90,7 @@ typedef struct {
 } token;
 
 Vec_typedef(token);
+Vec_typedef(Vec(token));
 
 Vec_typedef(_Vec_token);
 

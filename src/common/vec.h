@@ -3,7 +3,9 @@
 
 #include <stdlib.h>
 
-#define Vec(type) _Vec_##type 
+#define CAT(a, b) a ## b
+
+#define Vec(type) CAT(_Vec_, type)
 #define VecPtr(type) _VecPtr_##type
 #define Vec_typedef(type) typedef struct Vec(type) { \
     type * at; \

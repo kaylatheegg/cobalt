@@ -33,3 +33,4 @@ To run it, type `./cobalt filename`. Currently, the documentation is a little...
 
 ## TODO
 - Make the lexer a "maximal token" consumption parser, rather than pretending C tokens are terminals in a Type 3 grammar with a recdec parser. This fixes a hack in preprocessing concat handling.
+- Fix error printing when an error occurs during macro expansion (currently, its a coin flip if you end up with an ICE or not)
