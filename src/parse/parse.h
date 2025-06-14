@@ -92,9 +92,6 @@ typedef struct {
 Vec_typedef(token);
 Vec_typedef(Vec(token));
 
-Vec_typedef(_Vec_token);
-
-
 typedef struct {
     bool is_function;
     bool is_variadic;

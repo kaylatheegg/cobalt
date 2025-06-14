@@ -175,7 +175,7 @@ int parser_phase2(parser_ctx* ctx, Vec(string) physical_lines) {
 
 void print_parsing_error(parser_ctx* ctx, token err_tok, char* format, ...) {
     //this handles errors relating to tokens, and so needs a token based error printing
-
+    print_token_stream(ctx);
     if (ctx->ctx->no_colour) printf(str_fmt ":%d: error: ", str_arg(ctx->ctx->curr_file), err_tok.line + 1);
     else printf(Bold str_fmt ":%d: " Reset Red Bold"error: "Reset, str_arg(ctx->ctx->curr_file), err_tok.line + 1);
 
@@ -705,6 +705,8 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
     if (curr_token().type == TOK_WHITESPACE) _index++; \
 } while(0)
 
+//TODO: add undef removal, see why stuff is BREAKING
+
 int parser_phase4(parser_ctx* ctx) {
     //phase 4 is macro replacement, and also any relevant cleanup from phase 3, along with any error catching
     //this means we're now doing errors, like for real this time
@@ -724,33 +726,106 @@ int parser_phase4(parser_ctx* ctx) {
             if (string_eq(curr_token().tok, constr("if"))) {
                 print_parsing_error(ctx, curr_token(), "TODO: if (once constant expressions are done)");
                 return -1;
-            } else if (string_eq(curr_token().tok, constr("ifdef"))) {
+            } else if (string_eq(curr_token().tok, constr("ifdef")) || string_eq(curr_token().tok, constr("ifndef"))) {
+                //this system is BAD.
+                //i cannot think of a more clever way of handling this currently
+                //
+
+                bool is_ifndef = string_eq(curr_token().tok, constr("ifndef"));
+                //there are 4 major components of an ifdef stack
+                //ifdef (group)
+                //elseif (group)
+                //else (group)
+                //endif
+                //we need to keep track of tokens in the ifdef, scan the entire thing, and then check defines
+                //after, we can replace.
+                size_t starting_index = _index - 1;
+                //we should really put this in a struct, but this is fine.
+                _index++;
+                skip_whitespace();
+                if (curr_token().type != PPTOK_IDENTIFIER) {
+                    print_parsing_error(ctx, curr_token(), "expected identifier");
+                    return -1;
+                }
+                token ifdef_define = curr_token();
+                printf("handling %d "str_fmt"\n", is_ifndef, str_arg(ifdef_define.tok));
+                _index++;
+                //now, we SHOULD be on a newline, but we arent checking.
+                //FIXME?: does this cause problems?
+                Vec(token) ifdef_toks = vec_new(token, 1);
+                for (; _index < ctx->tokens.len; _index++) {
+                    if (curr_token().itype == CTOK_HASH) {
+                        if (next_token().type != PPTOK_IDENTIFIER) {
+                            print_parsing_error(ctx, next_token(), "expected identifier");
+                        }
+                        //we now need to stop
+                        break;
+                    } 
+                    vec_append(&ifdef_toks, curr_token());
+                }
+
+                //augh. this is gonna be annoying.
+                //we now either have endif, else, or elif
+                _index++;
+                //we're on the identifier now
+                if (string_eq(curr_token().tok, constr("endif"))) {
+                    //we're done.
+                    //we now need to replace the macros from starting_index to _index with the "replacement list"
+                    //in ifdef_toks
+                    printf("removing %d toks\n", _index - starting_index + 1);
+                    for (size_t i = 0; i < (_index - starting_index + 1); i++) {
+                        printf("removing "str_fmt"\n", str_arg(ctx->tokens.at[starting_index].tok));
+                        vec_remove(&ctx->tokens, starting_index);
+                    }
+                    bool found_define = false;
+                    macro_define def = {};
+
+                    for_vec(macro_define* define, &ctx->defines) {
+                        if (string_eq(define->name.tok, ifdef_define.tok)) {
+                            found_define = true;
+                            def = *define;
+                            break;
+                        }
+                    }
+                    if ((found_define && !is_ifndef) || (!found_define && is_ifndef)) {
+                        //we can now replace
+                        for (size_t i = 0; i < ifdef_toks.len; i++) {
+                            printf("inserting "str_fmt"\n", str_arg(ifdef_toks.at[i].tok));
+                            vec_insert(&ctx->tokens, starting_index + i, ifdef_toks.at[i]);
+                        }
+                    }
+                    
+                    //_index is COMPLETELY bogus right now. we need to go to starting_index + ifdef_toks.len
+                    _index = starting_index + ifdef_toks.len - 1;
+                    continue;
+                } else if (string_eq(curr_token().tok, constr("else"))) {
+                    //augh.
+                } else {
+                    print_parsing_error(ctx, curr_token(), "unexpected directive "str_fmt, str_arg(curr_token().tok));
+                    return -1;
+                }
+
+
                 
-                print_parsing_error(ctx, curr_token(), "TODO: ifdef");
-                return -1;
-            } else if (string_eq(curr_token().tok, constr("ifndef"))) {
-                print_parsing_error(ctx, curr_token(), "TODO: ifndef");
-                return -1;
-            }
-            //elif group:
+                continue;
+            } 
+            //this is handled by ifdef parsing, and so these should be erroring
             else if (string_eq(curr_token().tok, constr("elif"))) {
-                print_parsing_error(ctx, curr_token(), "TODO: elif");
+                print_parsing_error(ctx, curr_token(), "unexpected elif");
                 return -1;
             } else if (string_eq(curr_token().tok, constr("elifdef"))) {
-                print_parsing_error(ctx, curr_token(), "TODO: elifdef");
+                print_parsing_error(ctx, curr_token(), "unexpected elifdef");
                 return -1;
             } else if (string_eq(curr_token().tok, constr("elifndef"))) {
-                print_parsing_error(ctx, curr_token(), "TODO: elifndef");
+                print_parsing_error(ctx, curr_token(), "unexpected elifndef");
                 return -1;
             }
-            //else group:
             else if (string_eq(curr_token().tok, constr("else"))) {
-                print_parsing_error(ctx, curr_token(), "TODO: else");
+                print_parsing_error(ctx, curr_token(), "unexpected else");
                 return -1;
             }
-            //endif group:
             else if (string_eq(curr_token().tok, constr("endif"))) {
-                print_parsing_error(ctx, curr_token(), "TODO: endif");
+                print_parsing_error(ctx, curr_token(), "unexpected endif");
                 return -1;
             }
             //control line:
@@ -887,7 +962,11 @@ int parser_phase4(parser_ctx* ctx) {
                 size_t curr_line = curr_token().line;
 
                 if (next_token().type != TOK_WHITESPACE && next_token().itype != CTOK_OPEN_PAREN) {
-                    if (next_token().line != curr_token().line) continue; // for empty replacement lists
+                    if (next_token().line != curr_token().line) {
+                        //empty replacement lists still need defines
+                        vec_append(&ctx->defines, new_def);
+                        continue;
+                    }
                     print_parsing_warning(ctx, next_token(), "whitespace is required after a #define directive");
                 } else {
                     _index++;
@@ -992,11 +1071,11 @@ int parser_phase4(parser_ctx* ctx) {
                 }
                 //then, we search the defines list, and if we find this define, we remove it.
                 //if we dont find one, thats fine.
+                bool removed_define = false;
                 for_vec(macro_define* def, &ctx->defines) {
-                    if (string_eq(def->name.tok, curr_token().tok)) {
+                    if (!removed_define && string_eq(def->name.tok, curr_token().tok)) {
                         vec_remove(&ctx->defines, _index);
-                        _index--; //just incase
-                        continue;
+                        removed_define = true;
                     }
                 }
                 continue;

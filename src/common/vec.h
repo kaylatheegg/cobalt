@@ -5,8 +5,15 @@
 
 #define CAT(a, b) a ## b
 
-#define Vec(type) CAT(_Vec_, type)
-#define VecPtr(type) _VecPtr_##type
+#define Vec(type) CAT(_Vec_, type) 
+#define VecPtr(type) CAT(_VecPtr_, type) //explanation:
+/*
+with a simple Vec(type) _Vec_##type macro,
+the arguments are expanded, concatenation occurs, so recursive Vec calls dont behave correctly,
+since you end up with _Vec_Vec(...).
+to fix this, we defer the concatenation with CAT, since the preprocessor expands macros defined by
+arguments first, and then macros in the rest of the replacement list, right to left.
+*/
 #define Vec_typedef(type) typedef struct Vec(type) { \
     type * at; \
     size_t len; \
