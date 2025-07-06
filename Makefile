@@ -45,6 +45,12 @@ debug: CFLAGS += $(DEBUGFLAGS)
 debug: OPT = -O0
 debug: build
 
+fuzz: CC = clang
+fuzz: LD = clang
+fuzz: CFLAGS += -fsanitize=fuzzer
+fuzz: CFLAGS += $(DEBUGFLAGS)
+fuzz: build
+
 clean:
 	@rm -rf build/
 	@mkdir build/
