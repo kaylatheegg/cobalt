@@ -20,7 +20,7 @@ void crash(char* error, ...) {
         printf("Obtained %d stack frames\n", size);
         for (int i = 0; i < size; i++) {
             string output_str = str(strings[i]);
-            if (output_str.raw[0] == '.') {
+            /*if (output_str.raw[0] == '.') {
                 // we need to trim
                 for (; output_str.raw[0] != '('; output_str.raw++)
                     ;
@@ -29,7 +29,7 @@ void crash(char* error, ...) {
                 for (; output_str.raw[close_bracket] != ')'; close_bracket++)
                     ;
                 output_str.len = close_bracket;
-            }
+            }*/
             printf("frame %d:\t" str_fmt "\n", i, str_arg(output_str));
         }
     }

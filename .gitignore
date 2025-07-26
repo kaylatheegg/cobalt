@@ -6,5 +6,7 @@
 *.so
 build/
 cobalt
+corpus/
+crash-*
 *.sublime-project
 *.sublime-workspace

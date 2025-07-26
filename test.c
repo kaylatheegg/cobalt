@@ -1,21 +1,6 @@
-#define xyz
+int main() {
+    printf("xyz");
+    return 0;
 
-#ifdef xyz
-    meow
-#endif
-
-#ifndef xyz
-    meow2
-#endif
-
-#undef xyz
-
-#ifdef xyz
-    meow ERROR
-#endif
-
-#ifdef xyz
-    meow ERROR2
-#elifndef xyz
-    meow4
-#endif
+    "xyz"      "123" "abc"
+}

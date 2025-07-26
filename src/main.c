@@ -1,3 +1,6 @@
+#include <unistd.h>
+#include <sys/stat.h>
+
 #include "orbit.h"
 #include "cobalt.h"
 #include "parse/parse.h"
@@ -5,8 +8,37 @@
 void parse_args(cobalt_ctx* ctx);
 void display_help();
 
+int cobalt_main(int argc, char* argv[]);
 
+#ifndef FUZZ
 int main(int argc, char* argv[]) {
+    cobalt_main(argc, argv);    
+}
+#else
+int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+    //we have to do some HEAVY jank here.
+    //we create a file, call cobalt_main, and then delete the file.
+    FsFile* fuzz_file = fs_open("fuzz.c", true, true);
+    //we do some jank here
+    write(fuzz_file->handle, data, size); //LINUX SPECIFIC
+    
+    fs_close(fuzz_file);
+    fs_destroy(fuzz_file);
+    //fix permissions
+    char* mode = "0666";
+    chmod("fuzz.c", strtol(mode, 0, 8)); //augh.
+
+    //then, we call into cobalt_main with the correct args
+    char** argv = malloc(sizeof(*argv) * 2);
+    argv[0] = "cobalt";
+    argv[1] = "fuzz.c";
+    int argc = 2;
+    int retval = cobalt_main(argc, argv);
+    return 0;  // Values other than 0 and -1 are reserved for future use.
+}
+#endif
+
+int cobalt_main(int argc, char* argv[]) {
     cobalt_ctx ctx = {.output_path = constr(""),
                       .curr_file = constr(""),
                       .implicit_output = false,

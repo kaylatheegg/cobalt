@@ -47,8 +47,8 @@ debug: build
 
 fuzz: CC = clang
 fuzz: LD = clang
-fuzz: CFLAGS += -fsanitize=fuzzer
-fuzz: CFLAGS += $(DEBUGFLAGS)
+fuzz: OPT = -O0
+fuzz: CFLAGS += -fsanitize=fuzzer -DFUZZ -g
 fuzz: build
 
 clean:

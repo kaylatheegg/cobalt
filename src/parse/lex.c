@@ -159,6 +159,11 @@ void print_lexing_error(parser_ctx* ctx, char* format, ...) {
     left_just_string.raw += num_len;
     printf(str_fmt"%d | ", str_arg(left_just_string), ctx->curr_line + 1);
 
+    if (ctx->logical_lines.at == NULL) {
+        printf("NOTE: no logical lines yet defined. what are you up to?\n");
+        return;
+    }
+
     //split the erroring line into 3 pieces, so we can bold the section we want
     string error_line = ctx->logical_lines.at[ctx->curr_line];
     string left_piece = string_make(error_line.raw, ctx->curr_offset);

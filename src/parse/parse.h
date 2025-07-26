@@ -114,35 +114,19 @@ typedef struct _parser_ctx {
     token curr_macro_name;
 } parser_ctx;
 
-typedef struct {
-    token elifdef_cond;
-    Vec(token) elifdef_block;
-    bool is_elifndef;
-} elifdef_block;
-
-Vec_typedef(elifdef_block);
-
-typedef struct {
-    token ifdef_cond;
-    Vec(token) ifdef_block;
-    bool is_ifndef;
-    Vec(elifdef_block) elifdef_blocks;
-    bool has_else;
-    Vec(token) else_block;
-} ifdef_block;
-
 int parse_file(cobalt_ctx* ctx, bool is_include);
 
 void parser_phase1(cobalt_ctx* ctx);
 int parser_phase2(parser_ctx* ctx, Vec(string) physical_lines);
 int parser_phase3(parser_ctx* ctx);
 int parser_phase4(parser_ctx* ctx);
+int parser_phase5(parser_ctx* ctx);
+int parser_phase6(parser_ctx* ctx);
 
 void print_token_stream(parser_ctx* ctx);
 
 int handle_include(parser_ctx* ctx, size_t hash_location);
 int handle_define(parser_ctx* ctx);
-int handle_ifdef(parser_ctx* ctx);
 
 #define pp_stream(tok) print_token_stream(&(parser_ctx){.tokens = (tok)})
 
