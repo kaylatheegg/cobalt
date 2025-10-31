@@ -116,6 +116,128 @@ int parse_file(cobalt_ctx* ctx, bool is_include) {
     return 0;
 }
 
+void print_parsing_error(parser_ctx* ctx, token err_tok, char* format, ...) {
+    return;
+    //this handles errors relating to tokens, and so needs a token based error printing
+    print_token_stream(ctx);
+    if (ctx->ctx->no_colour) printf(str_fmt ":%d: error: ", str_arg(ctx->ctx->curr_file), err_tok.line + 1);
+    else printf(Bold str_fmt ":%d: " Reset Red Bold"error: "Reset, str_arg(ctx->ctx->curr_file), err_tok.line + 1);
+
+    va_list args;
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+    printf("\n");
+    
+    //left justify the number when printing
+    size_t num_len = snprintf(NULL, 0, "%d", err_tok.line + 1);
+    string left_just_string = str("     ");
+    left_just_string.raw += num_len;
+    printf(str_fmt"%d | ", str_arg(left_just_string), err_tok.line + 1);
+
+    //assuming this token is actually from the line we care about, this should be relatively easy.
+ 
+    //split the erroring line into 3 pieces, so we can bold the section we want
+    string error_line = ctx->logical_lines.at[err_tok.line];
+    string left_piece = string_make(error_line.raw, err_tok.tok.raw - error_line.raw);
+    string central_piece = err_tok.tok;
+    string right_piece = string_make(error_line.raw + left_piece.len + err_tok.tok.len, error_line.len - central_piece.len - left_piece.len);
+    
+    if (left_piece.len + central_piece.len + 1 > 0xFFFF) return; //we're in a macro
+
+    //print out the erroring line
+    if (ctx->ctx->no_colour) printf(str_fmt"\n", str_arg(error_line));
+    else printf(str_fmt Bold Red str_fmt Reset str_fmt, str_arg(left_piece), str_arg(central_piece), str_arg(right_piece));
+
+    if (right_piece.raw[right_piece.len - 1] != '\n') printf("\n");
+
+    //on linux, we could use ansi escape sequences to move the cursor.
+    //i do not trust microsoft to implement this correctly.
+    string empty_space;
+    empty_space.raw = ccharalloc(left_piece.len + central_piece.len + 1, ' ');
+    empty_space.len = left_piece.len + central_piece.len + 1;
+
+    //now, we scan left_piece until we hit non-whitespace
+    size_t i = 0;
+    for (; i < left_piece.len; i++) {
+        if (isgraph(left_piece.raw[i])) break;
+    }
+    //copy that many bytes from left_piece into empty_space, so that the tabs match to ensure correct positioning
+    memcpy(empty_space.raw + 1, left_piece.raw, i);
+    //now, we fill out with ~
+    for (size_t i = left_piece.len; i < left_piece.len + central_piece.len; i++) {
+        empty_space.raw[i] = '~';
+    }
+    empty_space.raw[left_piece.len] = '^';
+
+    if (ctx->ctx->no_colour) printf("      | "str_fmt"\n", str_arg(empty_space));
+    else printf("      | "Red Bold str_fmt Reset"\n", str_arg(empty_space));
+    return;
+}
+
+void print_parsing_warning(parser_ctx* ctx, token err_tok, char* format, ...) {
+    //this handles errors relating to tokens, and so needs a token based error printing
+
+    if (ctx->ctx->no_colour) printf(str_fmt ":%d: warning: ", str_arg(ctx->ctx->curr_file), err_tok.line + 1);
+    else printf(Bold str_fmt ":%d: " Yellow Bold"warning: "Reset, str_arg(ctx->ctx->curr_file), err_tok.line + 1);
+
+    va_list args;
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+    printf("\n");
+    
+    //left justify the number when printing
+    size_t num_len = snprintf(NULL, 0, "%d", err_tok.line + 1);
+    string left_just_string = str("     ");
+    left_just_string.raw += num_len;
+    printf(str_fmt"%d | ", str_arg(left_just_string), err_tok.line + 1);
+
+    //assuming this token is actually from the line we care about, this should be relatively easy.
+
+    //split the erroring line into 3 pieces, so we can bold the section we want
+    string error_line = ctx->logical_lines.at[err_tok.line];
+    string left_piece = string_make(error_line.raw, err_tok.tok.raw - error_line.raw);
+    string central_piece = err_tok.tok;
+    string right_piece = string_make(error_line.raw + left_piece.len + err_tok.tok.len, error_line.len - central_piece.len - left_piece.len);
+    
+    //print out the erroring line
+    if (ctx->ctx->no_colour) printf(str_fmt"\n", str_arg(error_line));
+    else printf(str_fmt Bold Yellow str_fmt Reset str_fmt, str_arg(left_piece), str_arg(central_piece), str_arg(right_piece));
+
+    if (right_piece.raw[right_piece.len - 1] != '\n') printf("\n");
+
+    //on linux, we could use ansi escape sequences to move the cursor.
+    //i do not trust microsoft to implement this correctly.
+    string empty_space;
+    empty_space.raw = ccharalloc(left_piece.len + central_piece.len + 1, ' ');
+    empty_space.len = left_piece.len + central_piece.len + 1;
+
+    //now, we scan left_piece until we hit non-whitespace
+    size_t i = 0;
+    for (; i < left_piece.len; i++) {
+        if (isgraph(left_piece.raw[i])) break;
+    }
+    //copy that many bytes from left_piece into empty_space, so that the tabs match to ensure correct positioning
+    memcpy(empty_space.raw + 1, left_piece.raw, i);
+    //now, we fill out with ~
+    for (size_t i = left_piece.len; i < left_piece.len + central_piece.len; i++) {
+        empty_space.raw[i] = '~';
+    }
+    empty_space.raw[left_piece.len] = '^';
+
+    if (ctx->ctx->no_colour) printf("      | "str_fmt"\n", str_arg(empty_space));
+    else printf("      | "Yellow Bold str_fmt Reset"\n", str_arg(empty_space));
+    return;
+}
+
+macro_define init_define() {
+    macro_define new_def = (macro_define){.is_function = false,
+                                          .arguments = vec_new(token, 1),
+                                          .replacement_list = vec_new(token, 1)};
+    return new_def;
+}
+
 void print_token_stream(parser_ctx* ctx) {
     size_t curr_line = 0;
     printf("0: ");
@@ -241,123 +363,6 @@ int parser_phase6(parser_ctx* ctx) {
     return 0;
 }
 
-void print_parsing_error(parser_ctx* ctx, token err_tok, char* format, ...) {
-    //this handles errors relating to tokens, and so needs a token based error printing
-    print_token_stream(ctx);
-    if (ctx->ctx->no_colour) printf(str_fmt ":%d: error: ", str_arg(ctx->ctx->curr_file), err_tok.line + 1);
-    else printf(Bold str_fmt ":%d: " Reset Red Bold"error: "Reset, str_arg(ctx->ctx->curr_file), err_tok.line + 1);
-
-    va_list args;
-    va_start(args, format);
-    vprintf(format, args);
-    va_end(args);
-    printf("\n");
+int parser_phase7(parser_ctx* ctx) {
     
-    //left justify the number when printing
-    size_t num_len = snprintf(NULL, 0, "%d", err_tok.line + 1);
-    string left_just_string = str("     ");
-    left_just_string.raw += num_len;
-    printf(str_fmt"%d | ", str_arg(left_just_string), err_tok.line + 1);
-
-    //assuming this token is actually from the line we care about, this should be relatively easy.
- 
-    //split the erroring line into 3 pieces, so we can bold the section we want
-    string error_line = ctx->logical_lines.at[err_tok.line];
-    string left_piece = string_make(error_line.raw, err_tok.tok.raw - error_line.raw);
-    string central_piece = err_tok.tok;
-    string right_piece = string_make(error_line.raw + left_piece.len + err_tok.tok.len, error_line.len - central_piece.len - left_piece.len);
-    
-    if (left_piece.len + central_piece.len + 1 > 0xFFFF) return; //we're in a macro
-
-    //print out the erroring line
-    if (ctx->ctx->no_colour) printf(str_fmt"\n", str_arg(error_line));
-    else printf(str_fmt Bold Red str_fmt Reset str_fmt, str_arg(left_piece), str_arg(central_piece), str_arg(right_piece));
-
-    if (right_piece.raw[right_piece.len - 1] != '\n') printf("\n");
-
-    //on linux, we could use ansi escape sequences to move the cursor.
-    //i do not trust microsoft to implement this correctly.
-    string empty_space;
-    empty_space.raw = ccharalloc(left_piece.len + central_piece.len + 1, ' ');
-    empty_space.len = left_piece.len + central_piece.len + 1;
-
-    //now, we scan left_piece until we hit non-whitespace
-    size_t i = 0;
-    for (; i < left_piece.len; i++) {
-        if (isgraph(left_piece.raw[i])) break;
-    }
-    //copy that many bytes from left_piece into empty_space, so that the tabs match to ensure correct positioning
-    memcpy(empty_space.raw + 1, left_piece.raw, i);
-    //now, we fill out with ~
-    for (size_t i = left_piece.len; i < left_piece.len + central_piece.len; i++) {
-        empty_space.raw[i] = '~';
-    }
-    empty_space.raw[left_piece.len] = '^';
-
-    if (ctx->ctx->no_colour) printf("      | "str_fmt"\n", str_arg(empty_space));
-    else printf("      | "Red Bold str_fmt Reset"\n", str_arg(empty_space));
-    return;
-}
-
-void print_parsing_warning(parser_ctx* ctx, token err_tok, char* format, ...) {
-    //this handles errors relating to tokens, and so needs a token based error printing
-
-    if (ctx->ctx->no_colour) printf(str_fmt ":%d: warning: ", str_arg(ctx->ctx->curr_file), err_tok.line + 1);
-    else printf(Bold str_fmt ":%d: " Yellow Bold"warning: "Reset, str_arg(ctx->ctx->curr_file), err_tok.line + 1);
-
-    va_list args;
-    va_start(args, format);
-    vprintf(format, args);
-    va_end(args);
-    printf("\n");
-    
-    //left justify the number when printing
-    size_t num_len = snprintf(NULL, 0, "%d", err_tok.line + 1);
-    string left_just_string = str("     ");
-    left_just_string.raw += num_len;
-    printf(str_fmt"%d | ", str_arg(left_just_string), err_tok.line + 1);
-
-    //assuming this token is actually from the line we care about, this should be relatively easy.
-
-    //split the erroring line into 3 pieces, so we can bold the section we want
-    string error_line = ctx->logical_lines.at[err_tok.line];
-    string left_piece = string_make(error_line.raw, err_tok.tok.raw - error_line.raw);
-    string central_piece = err_tok.tok;
-    string right_piece = string_make(error_line.raw + left_piece.len + err_tok.tok.len, error_line.len - central_piece.len - left_piece.len);
-    
-    //print out the erroring line
-    if (ctx->ctx->no_colour) printf(str_fmt"\n", str_arg(error_line));
-    else printf(str_fmt Bold Yellow str_fmt Reset str_fmt, str_arg(left_piece), str_arg(central_piece), str_arg(right_piece));
-
-    if (right_piece.raw[right_piece.len - 1] != '\n') printf("\n");
-
-    //on linux, we could use ansi escape sequences to move the cursor.
-    //i do not trust microsoft to implement this correctly.
-    string empty_space;
-    empty_space.raw = ccharalloc(left_piece.len + central_piece.len + 1, ' ');
-    empty_space.len = left_piece.len + central_piece.len + 1;
-
-    //now, we scan left_piece until we hit non-whitespace
-    size_t i = 0;
-    for (; i < left_piece.len; i++) {
-        if (isgraph(left_piece.raw[i])) break;
-    }
-    //copy that many bytes from left_piece into empty_space, so that the tabs match to ensure correct positioning
-    memcpy(empty_space.raw + 1, left_piece.raw, i);
-    //now, we fill out with ~
-    for (size_t i = left_piece.len; i < left_piece.len + central_piece.len; i++) {
-        empty_space.raw[i] = '~';
-    }
-    empty_space.raw[left_piece.len] = '^';
-
-    if (ctx->ctx->no_colour) printf("      | "str_fmt"\n", str_arg(empty_space));
-    else printf("      | "Yellow Bold str_fmt Reset"\n", str_arg(empty_space));
-    return;
-}
-
-macro_define init_define() {
-    macro_define new_def = (macro_define){.is_function = false,
-                                          .arguments = vec_new(token, 1),
-                                          .replacement_list = vec_new(token, 1)};
-    return new_def;
 }
