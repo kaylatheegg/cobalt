@@ -5,6 +5,7 @@
 *.o
 *.so
 build/
+bin/
 cobalt
 corpus/
 crash-*

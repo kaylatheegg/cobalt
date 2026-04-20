@@ -1,11 +1,18 @@
 #include <ctype.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <errno.h>
 
-#include "orbit.h"
 #include "cobalt.h"
 #include "parse.h"
-#include "ansi.h"
-#include "str.h"
+#include "alloc.h"
+
+#include "common/ansi.h"
+#include "common/str.h"
+#include "common/vec.h"
+#include "common/util.h"
+#include "common/fs.h"
 
 // we will NOT enforce translation limits in this compiler, as per C23 5.2.5.2 footnote 13.
 // NOTABLE deviations: we ignore 6.10.5.4.3, since that seems fucking annoying. if this comes up as an issue,
@@ -19,12 +26,13 @@ int parse_file(cobalt_ctx* ctx, bool is_include) {
         return -1;
     } else if (curr_file == NULL) {
         //we search in the ctx's include paths for the correct path.
-        for_vec(string* path, &ctx->include_paths) {
+        for_n(i, 0, vec_len(ctx->include_paths)) {
+            string* path = &ctx->include_paths[i];
             string new_path = string_concat(*path, ctx->curr_file);
             printf("trying path: "str_fmt"\n", str_arg(new_path));
             curr_file = fs_open(clone_to_cstring(new_path), false, false);
             if (curr_file != NULL) {
-                _index = ctx->include_paths.len + 1;
+                i = vec_len(ctx->include_paths) + 1;
             }
         }
 
@@ -130,14 +138,14 @@ void print_parsing_error(parser_ctx* ctx, token err_tok, char* format, ...) {
     
     //left justify the number when printing
     size_t num_len = snprintf(NULL, 0, "%d", err_tok.line + 1);
-    string left_just_string = str("     ");
+    string left_just_string = strlit("     ");
     left_just_string.raw += num_len;
     printf(str_fmt"%d | ", str_arg(left_just_string), err_tok.line + 1);
 
     //assuming this token is actually from the line we care about, this should be relatively easy.
  
     //split the erroring line into 3 pieces, so we can bold the section we want
-    string error_line = ctx->logical_lines.at[err_tok.line];
+    string error_line = ctx->logical_lines[err_tok.line];
     string left_piece = string_make(error_line.raw, err_tok.tok.raw - error_line.raw);
     string central_piece = err_tok.tok;
     string right_piece = string_make(error_line.raw + left_piece.len + err_tok.tok.len, error_line.len - central_piece.len - left_piece.len);
@@ -188,14 +196,14 @@ void print_parsing_warning(parser_ctx* ctx, token err_tok, char* format, ...) {
     
     //left justify the number when printing
     size_t num_len = snprintf(NULL, 0, "%d", err_tok.line + 1);
-    string left_just_string = str("     ");
+    string left_just_string = strlit("     ");
     left_just_string.raw += num_len;
     printf(str_fmt"%d | ", str_arg(left_just_string), err_tok.line + 1);
 
     //assuming this token is actually from the line we care about, this should be relatively easy.
 
     //split the erroring line into 3 pieces, so we can bold the section we want
-    string error_line = ctx->logical_lines.at[err_tok.line];
+    string error_line = ctx->logical_lines[err_tok.line];
     string left_piece = string_make(error_line.raw, err_tok.tok.raw - error_line.raw);
     string central_piece = err_tok.tok;
     string right_piece = string_make(error_line.raw + left_piece.len + err_tok.tok.len, error_line.len - central_piece.len - left_piece.len);
@@ -261,7 +269,8 @@ int parser_phase2(parser_ctx* ctx, Vec(string) physical_lines) {
     Vec(string) logical_lines = vec_new(string, 1);
 
     string new_line = {.raw = NULL, .len = 0};
-    for_vec(string* line, &physical_lines) {
+    for_n(i, 0, vec_len(physical_lines)) {
+        string* line = &physical_lines[i];
         if (new_line.raw == NULL) new_line = *line;
         //scan to the end of the line to see if it matches the pattern "\\n"
         //if the line is the LAST line, this check should error!
@@ -270,10 +279,10 @@ int parser_phase2(parser_ctx* ctx, Vec(string) physical_lines) {
         mut_line.raw = mut_line.raw + mut_line.len - 2;
         mut_line.len = 2;
 
-        if (string_eq(mut_line, constr("\\\n"))) {
+        if (string_eq(mut_line, strlit("\\\n"))) {
             //we need to merge lines!
             //first, check if this is the last line
-            if (_index + 1 >= physical_lines.len) {
+            if (i + 1 >= vec_len(physical_lines)) {
                 //we're at the end! this is ERRORING!
                 print_lexing_error(ctx, "Unexpected \\ at end of file");
                 return -1;
@@ -281,7 +290,7 @@ int parser_phase2(parser_ctx* ctx, Vec(string) physical_lines) {
             //get rid of the \\n
             new_line.len -= 2;
             //create new string with next one appended, then make it logical
-            new_line = string_concat(new_line, physical_lines.at[_index + 1]);
+            new_line = string_concat(new_line, physical_lines[i + 1]);
             
             continue;
         } else {
@@ -311,11 +320,11 @@ extern char* token_str[];
     ctx->curr_tok_index += offset; \
 } while(0)
 
-#define next_token() ((ctx->curr_tok_index + 1 < ctx->tokens.len) ? ctx->tokens.at[ctx->curr_tok_index + 1] : (token){})
+#define next_token() ((ctx->curr_tok_index + 1 < vec_len(ctx->tokens)) ? ctx->tokens[ctx->curr_tok_index + 1] : (token){})
 
-#define next_token_from(offset) ((ctx->curr_tok_index + (offset) < ctx->tokens.len) ? ctx->tokens.at[ctx->curr_tok_index + (offset)] : (token){})
+#define next_token_from(offset) ((ctx->curr_tok_index + (offset) < vec_len(ctx->tokens)) ? ctx->tokens[ctx->curr_tok_index + (offset)] : (token){})
 
-#define curr_token() ((ctx->curr_tok_index < ctx->tokens.len) ? ctx->tokens.at[ctx->curr_tok_index] : (token){})
+#define curr_token() ((ctx->curr_tok_index < vec_len(ctx->tokens)) ? ctx->tokens[ctx->curr_tok_index] : (token){})
 
 #define skip_whitespace() do { \
     if (curr_token().type == TOK_WHITESPACE) ctx->curr_tok_index++; \
@@ -323,10 +332,11 @@ extern char* token_str[];
 
 // Adjacent string literal tokens are concatenated.
 int parser_phase6(parser_ctx* ctx) {
-    for_vec(token* tok, &ctx->tokens) {
+    for_n(i, 0, vec_len(ctx->tokens)) {
+        token* tok = &ctx->tokens[i];
         //augh.
-        ctx->curr_tok_index = _index;
-        size_t old_index = _index;
+        ctx->curr_tok_index = i;
+        size_t old_index = i;
         if (tok->type == PPTOK_STR_LIT) {
             skip_token(1);
             if (curr_token().type == TOK_WHITESPACE) skip_token(1);
@@ -348,15 +358,15 @@ int parser_phase6(parser_ctx* ctx) {
                              .was_included = false,
                              .tok = new_strlit};
             //remove left and right strings
-            vec_remove(&ctx->tokens, old_index);
-            if (ctx->tokens.at[old_index].type == TOK_WHITESPACE) vec_remove(&ctx->tokens, old_index);
-            vec_remove(&ctx->tokens, old_index);
+            vec_remove_ordered(&ctx->tokens, old_index);
+            if (ctx->tokens[old_index].type == TOK_WHITESPACE) vec_remove_ordered(&ctx->tokens, old_index);
+            vec_remove_ordered(&ctx->tokens, old_index);
             
             //insert new string
             vec_insert(&ctx->tokens, old_index, new_str);
             
-            //restore _index
-            _index = old_index - 1;
+            //restore i
+            i = old_index - 1;
         }
     }
     return 0;

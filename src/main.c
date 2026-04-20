@@ -1,7 +1,10 @@
 #include <unistd.h>
 #include <sys/stat.h>
+#include <stdio.h>
 
-#include "orbit.h"
+#include "common/vec.h"
+#include "common/str.h"
+#include "common/util.h"
 #include "cobalt.h"
 #include "parse/parse.h"
 
@@ -39,8 +42,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 #endif
 
 int cobalt_main(int argc, char* argv[]) {
-    cobalt_ctx ctx = {.output_path = constr(""),
-                      .curr_file = constr(""),
+    cobalt_ctx ctx = {.output_path = strlit(""),
+                      .curr_file = strlit(""),
                       .implicit_output = false,
                       .no_colour = false,
                       .include_paths = vec_new(string, 1)};
@@ -53,8 +56,8 @@ int cobalt_main(int argc, char* argv[]) {
     }
 
     parse_args(&ctx);
-    vec_append(&ctx.include_paths, constr("/usr/include/"));
-    vec_append(&ctx.include_paths, constr("/usr/include/linux/"));
+    vec_append(&ctx.include_paths, strlit("/usr/include/"));
+    vec_append(&ctx.include_paths, strlit("/usr/include/linux/"));
     if (ctx.curr_file.len == 0) {
         display_help();
         return -1;
@@ -84,29 +87,30 @@ void display_help() {
 }
 
 void parse_args(cobalt_ctx* ctx) {
-    for_vec(string* arg, &ctx->args) {
-        if (string_eq(*arg, constr("-nocol"))) {
+    for_n(i, 0, vec_len(ctx->args)) {
+        string* arg = &ctx->args[i];
+        if (string_eq(*arg, strlit("-nocol"))) {
             ctx->no_colour = true;
         }
 
-        if (string_eq(*arg, constr("-o"))) {
+        if (string_eq(*arg, strlit("-o"))) {
             //we've got an output path
-            if (_index + 1 >= ctx->args.len) {
+            if (i + 1 >= vec_len(ctx->args)) {
                 display_help();
                 exit(-1);
             }
             //get next arg
-            string arg = ctx->args.at[_index + 1];
-            _index++;
-            if (arg.raw[0] == '-') {
+            string next_arg = ctx->args[i + 1];
+            i++;
+            if (next_arg.raw[0] == '-') {
                 display_help();
                 exit(-1);
             }
-            ctx->output_path =arg; 
+            ctx->output_path = next_arg; 
             continue;
-        }        
+        }
 
-        if (string_eq(*arg, constr("-h"))) {
+        if (string_eq(*arg, strlit("-h"))) {
             display_help();
             exit(-1);
         }
@@ -115,16 +119,15 @@ void parse_args(cobalt_ctx* ctx) {
         //get first 2 chars of arg to see if its an include
         string new_arg = *arg;
         new_arg.len = 2;
-        if (string_eq(new_arg, constr("-I"))) {
+        if (string_eq(new_arg, strlit("-I"))) {
             //we've got an include path!
             if (arg->len == 2) {
-                //we do something... sinister
-                if (_index + 1 >= ctx->args.len) {
+                if (i + 1 >= vec_len(ctx->args)) {
                     display_help();
                     exit(-1);
                 }
-                _index++;
-                vec_append(&ctx->include_paths, ctx->args.at[_index]);
+                i++;
+                vec_append(&ctx->include_paths, ctx->args[i]);
                 continue;                
             }
 
@@ -137,7 +140,7 @@ void parse_args(cobalt_ctx* ctx) {
         new_arg = *arg;
         new_arg.raw = new_arg.raw + arg->len - 2;
         new_arg.len = 2;
-        if (string_eq(new_arg, constr(".c"))) {
+        if (string_eq(new_arg, strlit(".c"))) {
             //we've got a file name
             ctx->curr_file = *arg;
         }

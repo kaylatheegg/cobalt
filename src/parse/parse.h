@@ -89,9 +89,6 @@ typedef struct {
     bool from_macro_param;
 } token;
 
-Vec_typedef(token);
-Vec_typedef(Vec(token));
-
 typedef struct {
     bool is_function;
     bool is_variadic;
@@ -99,8 +96,6 @@ typedef struct {
     Vec(token) replacement_list;
     token name;
 } macro_define;
-
-Vec_typedef(macro_define);
 
 typedef struct _parser_ctx {
     Vec(token) tokens;

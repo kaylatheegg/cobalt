@@ -1,9 +1,15 @@
-#include "orbit.h"
-#include "cobalt.h"
-#include "parse.h"
-#include "ansi.h"
-
 #include <ctype.h>
+#include <stdarg.h>
+
+#include "alloc.h"
+#include "cobalt.h"
+#include "crash.h"
+#include "parse.h"
+
+#include "common/ansi.h"
+#include "common/str.h"
+#include "common/util.h"
+#include "common/vec.h"
 
 /*
 <pp-token> ::= <header-name> | 
@@ -17,7 +23,7 @@
 // <pp-identifier> ::= <non_digit> (<non_digit> | <digit>)*
 // we ignore XID_Start and XID_Continue characteristics, since we dont support wchar.
 
-#define CURR_LINE ctx->logical_lines.at[ctx->curr_line]
+#define CURR_LINE ctx->logical_lines[ctx->curr_line]
 
 int pp_scan_identifier(parser_ctx* ctx) {
     size_t len = 0;
@@ -58,9 +64,9 @@ int pp_scan_identifier(parser_ctx* ctx) {
 */
 
 #define scan_next_char() \
-    ((ctx->curr_offset + 1 < ctx->logical_lines.at[ctx->curr_line].len) ? (ctx->logical_lines.at[ctx->curr_line].raw[ctx->curr_offset + 1]) : ('\0'))
+    ((ctx->curr_offset + 1 < ctx->logical_lines[ctx->curr_line].len) ? (ctx->logical_lines[ctx->curr_line].raw[ctx->curr_offset + 1]) : ('\0'))
 
-#define CURR_CHAR ctx->logical_lines.at[ctx->curr_line].raw[ctx->curr_offset]
+#define CURR_CHAR ctx->logical_lines[ctx->curr_line].raw[ctx->curr_offset]
 
 int pp_scan_number(parser_ctx* ctx) {
     size_t start_offset = ctx->curr_offset;
@@ -155,17 +161,17 @@ void print_lexing_error(parser_ctx* ctx, char* format, ...) {
     
     //left justify the number when printing
     size_t num_len = snprintf(NULL, 0, "%d", ctx->curr_line + 1);
-    string left_just_string = str("     ");
+    string left_just_string = string_wrap("     ");
     left_just_string.raw += num_len;
     printf(str_fmt"%d | ", str_arg(left_just_string), ctx->curr_line + 1);
 
-    if (ctx->logical_lines.at == NULL) {
+    if (ctx->logical_lines == NULL) {
         printf("NOTE: no logical lines yet defined. what are you up to?\n");
         return;
     }
 
     //split the erroring line into 3 pieces, so we can bold the section we want
-    string error_line = ctx->logical_lines.at[ctx->curr_line];
+    string error_line = ctx->logical_lines[ctx->curr_line];
     string left_piece = string_make(error_line.raw, ctx->curr_offset);
     string central_piece = string_make(error_line.raw + ctx->curr_offset, 1);
     string right_piece = string_make(error_line.raw + ctx->curr_offset + 1, error_line.len - ctx->curr_offset - 1);
@@ -209,25 +215,25 @@ U here represents all chars, i just cannot be arsed to write out all the specifi
 
 size_t pp_detect_encoding(parser_ctx* ctx) {
     //first, check if the current line has atleast 2 further chars
-    if (ctx->curr_offset + 2 < ctx->logical_lines.at[ctx->curr_line].len) {
+    if (ctx->curr_offset + 2 < ctx->logical_lines[ctx->curr_line].len) {
         //we've got atleast 2 more chars, so we can do the u8" check
         string modified_line = CURR_LINE;
         modified_line.len = 3;
         modified_line.raw += ctx->curr_offset;
-        if (string_eq(modified_line, str("u8\""))) return 2; //enough to skip u8
-        if (string_eq(modified_line, str("u8\'"))) return 2; //enough to skip u8
+        if (string_eq(modified_line, string_wrap("u8\""))) return 2; //enough to skip u8
+        if (string_eq(modified_line, string_wrap("u8\'"))) return 2; //enough to skip u8
     } 
-    if (ctx->curr_offset + 1 < ctx->logical_lines.at[ctx->curr_line].len) {
+    if (ctx->curr_offset + 1 < ctx->logical_lines[ctx->curr_line].len) {
         //we've got atleast ONE extra char
         string modified_line = CURR_LINE;
         modified_line.len = 2;
         modified_line.raw += ctx->curr_offset;
-        if (string_eq(modified_line, str("u\""))) return 1;
-        if (string_eq(modified_line, str("u\'"))) return 1;
-        if (string_eq(modified_line, str("U\""))) return 1;
-        if (string_eq(modified_line, str("U\'"))) return 1;
-        if (string_eq(modified_line, str("L\""))) return 1;
-        if (string_eq(modified_line, str("L\'"))) return 1;
+        if (string_eq(modified_line, string_wrap("u\""))) return 1;
+        if (string_eq(modified_line, string_wrap("u\'"))) return 1;
+        if (string_eq(modified_line, string_wrap("U\""))) return 1;
+        if (string_eq(modified_line, string_wrap("U\'"))) return 1;
+        if (string_eq(modified_line, string_wrap("L\""))) return 1;
+        if (string_eq(modified_line, string_wrap("L\'"))) return 1;
     }
     return 0;
 }
@@ -290,13 +296,13 @@ int pp_scan_char_or_str(parser_ctx* ctx) {
 #undef CURR_CHAR
 
 #define scan_next_char() \
-    ((ctx->curr_offset + 1 < line->len) ? (line->raw[ctx->curr_offset + 1]) : ('\0'))
+    ((ctx->curr_offset + 1 < line.len) ? (line.raw[ctx->curr_offset + 1]) : ('\0'))
 
 #define scan_next_char_from(offset) \
-    ((ctx->curr_offset + (offset) < line->len) ? (line->raw[ctx->curr_offset + (offset)]) : ('\0'))
+    ((ctx->curr_offset + (offset) < line.len) ? (line.raw[ctx->curr_offset + (offset)]) : ('\0'))
 
 
-#define CURR_CHAR line->raw[ctx->curr_offset]
+#define CURR_CHAR line.raw[ctx->curr_offset]
 
 int parser_phase3(parser_ctx* ctx) {
     //we continually iterate over all the characters in each logical line,
@@ -307,12 +313,14 @@ int parser_phase3(parser_ctx* ctx) {
 
     bool ml_comment = false;
     bool is_header = false;
-    for_vec(string* line, &ctx->logical_lines) {
+    for_n(i, 0, vec_len(ctx->logical_lines)) {
         bool after_newline = true;
-        size_t vec_len_before = ctx->logical_lines.len;
-        ctx->curr_line = _index; //for pp_scan_identifier
-        for (ctx->curr_offset = 0; ctx->curr_offset < line->len; ctx->curr_offset++) {
-            if (vec_len_before != ctx->logical_lines.len) after_newline = false;
+        size_t vec_len_before = vec_len(ctx->logical_lines);
+        string line = ctx->logical_lines[i];
+
+        ctx->curr_line = i; //for pp_scan_identifier
+        for (ctx->curr_offset = 0; ctx->curr_offset < line.len; ctx->curr_offset++) {
+            if (vec_len_before != vec_len(ctx->logical_lines)) after_newline = false;
             if (ml_comment == true) {
                 //we are in ml comment scanning mode.
                 //we scan this char, and the next char, until we find */. we can then exit ml_comment mode
@@ -330,13 +338,13 @@ int parser_phase3(parser_ctx* ctx) {
                 case '\n': {
                     //we need to emit a whitespace "token", because the c standard is stupid.
                     size_t start_offset = ctx->curr_offset;
-                    for (; ctx->curr_offset < line->len; ctx->curr_offset++) {
+                    for (; ctx->curr_offset < line.len; ctx->curr_offset++) {
                         if (CURR_CHAR != ' ' && CURR_CHAR != '\t' && CURR_CHAR != '\n' && CURR_CHAR != '\r' && CURR_CHAR != '\f') break;
                     }
                     ctx->curr_offset--;
                     token new_tok = (token){.type = TOK_WHITESPACE,
                                             .itype = TOK_WHITESPACE,
-                                            .tok = string_make(line->raw + start_offset, ctx->curr_offset - start_offset + 1),
+                                            .tok = string_make(line.raw + start_offset, ctx->curr_offset - start_offset + 1),
                                             .line = ctx->curr_line};
                     //quickly, we're gonna fix up the whitespace so it prints right
                     for (size_t i = 0; i < new_tok.tok.len; i++) {
@@ -357,7 +365,7 @@ int parser_phase3(parser_ctx* ctx) {
                 case '}': {
                     //create token
                     token new_tok = (token){.type = PPTOK_PUNCT,
-                                             .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                             .tok = string_make(line.raw + ctx->curr_offset, 1),
                                              .line = ctx->curr_line};
                     //assign correct ctok
                     token_type itype = TOK_INVALID;
@@ -378,7 +386,7 @@ int parser_phase3(parser_ctx* ctx) {
                         if (scan_next_char_from(2) == '.') {
                             token new_tok = (token){.type = PPTOK_PUNCT,
                                                     .itype = CTOK_ELLIPSIS,
-                                                    .tok = string_make(line->raw + ctx->curr_offset, 3),
+                                                    .tok = string_make(line.raw + ctx->curr_offset, 3),
                                                     .line = ctx->curr_line};
                             vec_append(&ctx->tokens, new_tok);        
                             ctx->curr_offset += 2;                
@@ -392,7 +400,7 @@ int parser_phase3(parser_ctx* ctx) {
 
                     token new_tok = (token){.type = PPTOK_PUNCT,
                                             .itype = CTOK_DOT,
-                                            .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                            .tok = string_make(line.raw + ctx->curr_offset, 1),
                                             .line = ctx->curr_line};
                     vec_append(&ctx->tokens, new_tok);
                     continue;
@@ -401,14 +409,14 @@ int parser_phase3(parser_ctx* ctx) {
                     if (scan_next_char() != '=' && scan_next_char() != '>' && scan_next_char() != '-') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_MINUS,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 1),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);
                         continue;
                     } else if (scan_next_char() == '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_ASSIGN_SUB,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);
                         ctx->curr_offset++;
@@ -416,7 +424,7 @@ int parser_phase3(parser_ctx* ctx) {
                     } else if (scan_next_char() == '>') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_ARROW,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);
                         ctx->curr_offset++;
@@ -424,7 +432,7 @@ int parser_phase3(parser_ctx* ctx) {
                     } else if (scan_next_char() == '-') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_DEC,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);
                         ctx->curr_offset++;
@@ -436,14 +444,14 @@ int parser_phase3(parser_ctx* ctx) {
                     if (scan_next_char() != '=' && scan_next_char() != '+') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_PLUS,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 1),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);        
                         continue;               
                     } else if (scan_next_char() == '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_ASSIGN_ADD,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);
                         ctx->curr_offset++;
@@ -451,7 +459,7 @@ int parser_phase3(parser_ctx* ctx) {
                     } else if (scan_next_char() == '+') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_INC,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);
                         ctx->curr_offset++;
@@ -463,14 +471,14 @@ int parser_phase3(parser_ctx* ctx) {
                     if (scan_next_char() != '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_TIMES,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 1),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);              
                         continue;          
                     } else if (scan_next_char() == '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_ASSIGN_TIMES,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);              
                         ctx->curr_offset++;
@@ -481,7 +489,7 @@ int parser_phase3(parser_ctx* ctx) {
                 case '~': { // ~
                     token new_tok = (token){.type = PPTOK_PUNCT,
                                             .itype = CTOK_TILDE,
-                                            .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                            .tok = string_make(line.raw + ctx->curr_offset, 1),
                                             .line = ctx->curr_line};
                     vec_append(&ctx->tokens, new_tok);
                     continue;
@@ -490,14 +498,14 @@ int parser_phase3(parser_ctx* ctx) {
                     if (scan_next_char() != '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_EXCLAM,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 1),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);              
                         continue;          
                     } else if (scan_next_char() == '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_NOT_EQ,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);              
                         ctx->curr_offset++;
@@ -511,7 +519,7 @@ int parser_phase3(parser_ctx* ctx) {
                         //this if is kinda ugly, but its required to correctly lex with identifiers against punct
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_FWSLASH,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 1),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);
                         //we dont skip offset here, since we only scan this one
@@ -519,7 +527,7 @@ int parser_phase3(parser_ctx* ctx) {
                     } else if (scan_next_char() == '=') { // /= case
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_ASSIGN_DIV,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);
                         ctx->curr_offset++;
@@ -533,7 +541,7 @@ int parser_phase3(parser_ctx* ctx) {
                         continue;  
                     } else if (scan_next_char() == '/') { // // case
                         //we can now skip this line COMPLETELY, so we set offset to the end of the line
-                        ctx->curr_offset = line->len;
+                        ctx->curr_offset = line.len;
                         continue;
                     }
                     return -1;
@@ -542,14 +550,14 @@ int parser_phase3(parser_ctx* ctx) {
                     if (scan_next_char() != ':' && scan_next_char() != '>' && scan_next_char() != '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_PERCENT,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 1),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);          
                         continue;              
                     } else if (scan_next_char() == '>') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_CLOSE_BRACE,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);    
                         ctx->curr_offset++;
@@ -557,7 +565,7 @@ int parser_phase3(parser_ctx* ctx) {
                     } else if (scan_next_char() == '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_ASSIGN_MOD,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);    
                         ctx->curr_offset++;
@@ -566,7 +574,7 @@ int parser_phase3(parser_ctx* ctx) {
                         if (scan_next_char_from(2) == '%' && scan_next_char_from(3) == ':') {
                             token new_tok = (token){.type = PPTOK_PUNCT,
                                                     .itype = CTOK_HASH_HASH,
-                                                    .tok = string_make(line->raw + ctx->curr_offset, 4),
+                                                    .tok = string_make(line.raw + ctx->curr_offset, 4),
                                                     .line = ctx->curr_line};
                             vec_append(&ctx->tokens, new_tok);    
                             ctx->curr_offset+=3;
@@ -574,7 +582,7 @@ int parser_phase3(parser_ctx* ctx) {
                         }
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_HASH,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);    
                         ctx->curr_offset++;
@@ -586,7 +594,7 @@ int parser_phase3(parser_ctx* ctx) {
                     if (scan_next_char() != '<' && scan_next_char() != '=' && scan_next_char() != ':' && scan_next_char() != '%') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_LESS_THAN,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 1),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);          
                         continue;         
@@ -594,7 +602,7 @@ int parser_phase3(parser_ctx* ctx) {
                         if (scan_next_char_from(2) == '=') {
                             token new_tok = (token){.type = PPTOK_PUNCT,
                                                     .itype = CTOK_ASSIGN_LSHIFT,
-                                                    .tok = string_make(line->raw + ctx->curr_offset, 3),
+                                                    .tok = string_make(line.raw + ctx->curr_offset, 3),
                                                     .line = ctx->curr_line};
                             vec_append(&ctx->tokens, new_tok);      
                             ctx->curr_offset+=2;    
@@ -603,7 +611,7 @@ int parser_phase3(parser_ctx* ctx) {
 
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_LSHIFT,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);      
                         ctx->curr_offset++;    
@@ -611,7 +619,7 @@ int parser_phase3(parser_ctx* ctx) {
                     } else if (scan_next_char() == '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_LESS_EQ,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);      
                         ctx->curr_offset++;    
@@ -619,7 +627,7 @@ int parser_phase3(parser_ctx* ctx) {
                     } else if (scan_next_char() == ':') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_OPEN_SQUBRACE,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);      
                         ctx->curr_offset++;    
@@ -627,7 +635,7 @@ int parser_phase3(parser_ctx* ctx) {
                     } else if (scan_next_char() == '%') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_OPEN_BRACE,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);      
                         ctx->curr_offset++;    
@@ -639,7 +647,7 @@ int parser_phase3(parser_ctx* ctx) {
                     if (scan_next_char() != '>' && scan_next_char() != '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_GREATER_THAN,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 1),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);       
                         continue;                                 
@@ -647,7 +655,7 @@ int parser_phase3(parser_ctx* ctx) {
                         if (scan_next_char_from(2) == '=') {
                             token new_tok = (token){.type = PPTOK_PUNCT,
                                                     .itype = CTOK_ASSIGN_RSHIFT,
-                                                    .tok = string_make(line->raw + ctx->curr_offset, 3),
+                                                    .tok = string_make(line.raw + ctx->curr_offset, 3),
                                                     .line = ctx->curr_line};
                             vec_append(&ctx->tokens, new_tok);      
                             ctx->curr_offset+=2;    
@@ -656,7 +664,7 @@ int parser_phase3(parser_ctx* ctx) {
 
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_RSHIFT,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);      
                         ctx->curr_offset++;    
@@ -664,7 +672,7 @@ int parser_phase3(parser_ctx* ctx) {
                     } else if (scan_next_char() == '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_GREATER_EQ,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);      
                         ctx->curr_offset++;    
@@ -676,14 +684,14 @@ int parser_phase3(parser_ctx* ctx) {
                     if (scan_next_char() != '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_EQ,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 1),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);       
                         continue;                                                
                     } else if (scan_next_char() == '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_EQ_EQ,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);       
                         ctx->curr_offset++;
@@ -695,14 +703,14 @@ int parser_phase3(parser_ctx* ctx) {
                     if (scan_next_char() != '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_CARET,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 1),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);       
                         continue;                                                
                     } else if (scan_next_char() == '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_ASSIGN_XOR,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);       
                         ctx->curr_offset++;
@@ -714,14 +722,14 @@ int parser_phase3(parser_ctx* ctx) {
                     if (scan_next_char() != '=' && scan_next_char() != '|') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_OR,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 1),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);       
                         continue;                                            
                     } else if (scan_next_char() == '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_ASSIGN_OR,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);       
                         ctx->curr_offset++;
@@ -729,7 +737,7 @@ int parser_phase3(parser_ctx* ctx) {
                     } else if (scan_next_char() == '|') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_OR_OR,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);       
                         ctx->curr_offset++;
@@ -741,14 +749,14 @@ int parser_phase3(parser_ctx* ctx) {
                     if (scan_next_char() != '=' && scan_next_char() != '&') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_AMPERSAND,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 1),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);       
                         continue;                                            
                     } else if (scan_next_char() == '=') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_ASSIGN_AND,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);       
                         ctx->curr_offset++;
@@ -756,7 +764,7 @@ int parser_phase3(parser_ctx* ctx) {
                     } else if (scan_next_char() == '&') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_AND_AND,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);       
                         ctx->curr_offset++;
@@ -767,7 +775,7 @@ int parser_phase3(parser_ctx* ctx) {
                 case '?': { // ?
                     token new_tok = (token){.type = PPTOK_PUNCT,
                                             .itype = CTOK_QUESTION,
-                                            .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                            .tok = string_make(line.raw + ctx->curr_offset, 1),
                                             .line = ctx->curr_line};
                     vec_append(&ctx->tokens, new_tok);              
                     continue;      
@@ -776,14 +784,14 @@ int parser_phase3(parser_ctx* ctx) {
                     if (scan_next_char() != '>' && scan_next_char() != ':') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_COLON,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 1),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);       
                         continue;                                            
                     } else if (scan_next_char() == '>') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_CLOSE_BRACE,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);       
                         ctx->curr_offset++;
@@ -791,7 +799,7 @@ int parser_phase3(parser_ctx* ctx) {
                     } else if (scan_next_char() == ':') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_COLON_COLON,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);       
                         ctx->curr_offset++;
@@ -802,7 +810,7 @@ int parser_phase3(parser_ctx* ctx) {
                 case ';': { // ;
                     token new_tok = (token){.type = PPTOK_PUNCT,
                                             .itype = CTOK_SEMICOLON,
-                                            .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                            .tok = string_make(line.raw + ctx->curr_offset, 1),
                                             .line = ctx->curr_line};
                     vec_append(&ctx->tokens, new_tok);              
                     continue;      
@@ -810,7 +818,7 @@ int parser_phase3(parser_ctx* ctx) {
                 case ',': { // ,
                     token new_tok = (token){.type = PPTOK_PUNCT,
                                             .itype = CTOK_COMMA,
-                                            .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                            .tok = string_make(line.raw + ctx->curr_offset, 1),
                                             .line = ctx->curr_line};
                     vec_append(&ctx->tokens, new_tok);              
                     continue;      
@@ -819,7 +827,7 @@ int parser_phase3(parser_ctx* ctx) {
                     if (scan_next_char() != '#') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_HASH,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 1),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 1),
                                                 .after_newline = after_newline,
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);       
@@ -827,7 +835,7 @@ int parser_phase3(parser_ctx* ctx) {
                     } else if (scan_next_char() == '#') {
                         token new_tok = (token){.type = PPTOK_PUNCT,
                                                 .itype = CTOK_HASH_HASH,
-                                                .tok = string_make(line->raw + ctx->curr_offset, 2),
+                                                .tok = string_make(line.raw + ctx->curr_offset, 2),
                                                 .line = ctx->curr_line};
                         vec_append(&ctx->tokens, new_tok);       
                         ctx->curr_offset++;
@@ -857,7 +865,7 @@ int parser_phase3(parser_ctx* ctx) {
                         if (pp_scan_number(ctx) != 0) return -1;
                         continue;
                     }
-                    print_lexing_error(ctx, "encountered unexpected char %c", line->raw[ctx->curr_offset], _index + 1, ctx->curr_offset + 1);
+                    print_lexing_error(ctx, "encountered unexpected char %c", line.raw[ctx->curr_offset], i + 1, ctx->curr_offset + 1);
                     return -1;
             }
         }

@@ -1,3 +1,5 @@
+# todo: Fix this
+
 SRCPATHS = \
 	src/ctype/*.c 
 

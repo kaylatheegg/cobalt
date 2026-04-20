@@ -1,6 +1,9 @@
 #pragma once
 #define COBALT_H
 
+#include "common/str.h"
+#include "common/vec.h"
+
 typedef struct _parser_ctx parser_ctx;
 
 typedef struct {
