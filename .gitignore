@@ -10,3 +10,5 @@ corpus/
 crash-*
 *.sublime-project
 *.sublime-workspace
+*.clangd
+*.vscode

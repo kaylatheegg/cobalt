@@ -117,7 +117,6 @@ int parse_file(cobalt_ctx* ctx, bool is_include) {
 }
 
 void print_parsing_error(parser_ctx* ctx, token err_tok, char* format, ...) {
-    return;
     //this handles errors relating to tokens, and so needs a token based error printing
     print_token_stream(ctx);
     if (ctx->ctx->no_colour) printf(str_fmt ":%d: error: ", str_arg(ctx->ctx->curr_file), err_tok.line + 1);
