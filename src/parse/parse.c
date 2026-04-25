@@ -14,6 +14,8 @@
 #include "common/util.h"
 #include "common/fs.h"
 
+// TODO: remove whitespace before preprocessing
+
 // we will NOT enforce translation limits in this compiler, as per C23 5.2.5.2 footnote 13.
 // NOTABLE deviations: we ignore 6.10.5.4.3, since that seems fucking annoying. if this comes up as an issue,
 //                     we can implement this correctly.                 
@@ -316,8 +318,6 @@ int parser_phase5(parser_ctx* ctx) {
     return 0;
 }
 
-extern char* token_str[];
-
 #define skip_token(offset) do { \
     ctx->curr_tok_index += offset; \
 } while(0)
@@ -378,9 +378,29 @@ int parser_phase7(parser_ctx* ctx) {
     /* Token transformation: Convert tokens over to their syntactical versions */
     for_n(i, 0, vec_len(ctx->tokens)) {
         token* tok = &ctx->tokens[i];
-        #define TOKEN(type, str)
-            //if (tok)
+        if (tok->type == TOK_WHITESPACE) {
+            vec_remove_ordered(&ctx->tokens, i);
+            i--;
+            continue;
+        }
+
+        if (tok->type == PPTOK_CHAR_CONST) tok->itype = TOK_CONSTANT;
+        if (tok->type == PPTOK_IDENTIFIER) tok->itype = TOK_IDENTIFIER;
+        if (tok->type == PPTOK_NUMBER) tok->itype = TOK_CONSTANT;
+
+        #define TOKEN(type, str) if (string_eq(tok->tok, strlit((str)))) tok->itype = (type);
+            PUNCT 
+            KEYWORDS
         #undef TOKEN
+    
+        /* Copy over the type to itype */
+        if (tok->itype == TOK_INVALID)
+            tok->itype = tok->type;
+    }
+
+    /* Begin parsing */
+    for_n(i, 0, vec_len(ctx->tokens)) {
+        
     }
 
     return 0;

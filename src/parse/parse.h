@@ -112,11 +112,9 @@
     TOKEN(TOK_INVALID, "[INVALID]") \
     TOKEN(TOK_WHITESPACE, "whitespace") \
     /* token: */ \
-    TOKEN(TOK_KEYWORD, "keyword") \
     TOKEN(TOK_IDENTIFIER, "identifier") \
     TOKEN(TOK_CONSTANT, "constant") \
     TOKEN(TOK_STR_LIT, "string-literal") \
-    TOKEN(TOK_PUNCT, "punctuator") \
     /* preprocessing-token: */ \
     TOKEN(PPTOK_HEADER_NAME, "header-name") \
     TOKEN(PPTOK_IDENTIFIER, "pp-identifier") \
@@ -171,6 +169,9 @@ typedef struct _parser_ctx {
     Vec(macro_define) defines;
     token curr_macro_name;
 } parser_ctx;
+
+extern char* token_str[];
+extern char* token_enum_str[];
 
 int parse_file(cobalt_ctx* ctx, bool is_include);
 

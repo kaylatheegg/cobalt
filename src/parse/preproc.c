@@ -14,6 +14,12 @@ char* token_str[] = {
 #undef TOKEN
 };
 
+char* token_enum_str[] = {
+#define TOKEN(tok, str) #tok,
+    TOKEN_EXPANDER
+#undef TOKEN
+};
+
 string pp_stringize_token_stream(Vec(token) stream) {
     string builder = string_alloc(64);
     size_t cursor = 1;
@@ -451,12 +457,6 @@ int parser_phase4(parser_ctx* ctx) {
     for_n(i, 0, vec_len(ctx->tokens)) {
         ctx->curr_tok_index = i;
         token* tok = &ctx->tokens[i];
-
-        printf("processing "str_fmt"\n", str_arg(tok->tok));
-
-        if (tok->tok.raw[0] != '#') {
-            printf("non hash!\n");
-        }
 
         if (tok->itype == CTOK_HASH && tok->after_newline == true) {
             size_t hash_location = ctx->curr_tok_index;

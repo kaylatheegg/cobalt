@@ -116,9 +116,6 @@ typedef struct {
         AST* expr; \
     ) \
     
-    
-
-
 typedef enum {
     AST_invalid,
 #define ast_node(x, ...) AST_##x,
@@ -141,8 +138,6 @@ typedef struct AST {
 typedef struct {
 
 } type;
-
-Vec_typedef(AST);
 
 #define ast_node(ident, def) typedef struct ast_##ident { ast_base base; def } ast_##ident;
 AST_NODES

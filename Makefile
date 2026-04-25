@@ -79,4 +79,8 @@ clean:
 test: build
 	cd tests; ./run.sh
 
+.PHONY: bear-gen-cc
+bear-gen-cc: clean
+	bear -- $(MAKE) all
+
 -include $(OBJECTS:.o=.d)

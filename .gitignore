@@ -13,3 +13,5 @@ crash-*
 *.sublime-workspace
 *.clangd
 *.vscode
+*.cache
+compile_commands.json
