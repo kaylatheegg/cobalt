@@ -37,7 +37,7 @@ int parse_file(cobalt_ctx* ctx, bool is_include) {
         }
 
         if (curr_file == NULL) {
-            printf("unable to open file2: "str_fmt"\n", str_arg(ctx->curr_file));
+            printf("unable to open file: "str_fmt"\n", str_arg(ctx->curr_file));
             return -1;
         }
     }
@@ -116,8 +116,10 @@ int parse_file(cobalt_ctx* ctx, bool is_include) {
     if (parser_phase5(pctx) != 0) return -1;
 
     if (parser_phase6(pctx) != 0) return -1;
-
+    
     print_token_stream(pctx);
+
+    if (parser_phase7(pctx) != 0) return -1;
 
     cfree(pctx);
 
@@ -373,5 +375,13 @@ int parser_phase6(parser_ctx* ctx) {
 }
 
 int parser_phase7(parser_ctx* ctx) {
-    
+    /* Token transformation: Convert tokens over to their syntactical versions */
+    for_n(i, 0, vec_len(ctx->tokens)) {
+        token* tok = &ctx->tokens[i];
+        #define TOKEN(type, str)
+            //if (tok)
+        #undef TOKEN
+    }
+
+    return 0;
 }

@@ -1,26 +1,7 @@
 #pragma once
 #define PARSE_H
 
-#define TOKENS \
-    TOKEN(TOK_INVALID, "[INVALID]") \
-    TOKEN(TOK_WHITESPACE, "whitespace") \
-    /* token: */ \
-    TOKEN(TOK_KEYWORD, "keyword") \
-    TOKEN(TOK_IDENTIFIER, "identifier") \
-    TOKEN(TOK_CONSTANT, "constant") \
-    TOKEN(TOK_STR_LIT, "string-literal") \
-    TOKEN(TOK_PUNCT, "punctuator") \
-    /* preprocessing-token: */ \
-    TOKEN(PPTOK_HEADER_NAME, "header-name") \
-    TOKEN(PPTOK_IDENTIFIER, "pp-identifier") \
-    TOKEN(PPTOK_NUMBER, "pp-number") \
-    TOKEN(PPTOK_CHAR_CONST, "character-constant") \
-    TOKEN(PPTOK_STR_LIT, "pp-string-literal") \
-    TOKEN(PPTOK_PUNCT, "pp-punctuator") \
-    /* from here on, these are non-c tokens, but these make parsing easier. */ \
-    /* these get transformed during step 3 of compilation, before its supposed to. */ \
-    /* we still keep track of the c token type (token:), but we use itype for actual parsing */ \
-    /* punct */ \
+#define PUNCT \
     TOKEN(CTOK_OPEN_SQUBRACE, "[") \
     TOKEN(CTOK_CLOSE_SQUBRACE, "]") \
     TOKEN(CTOK_OPEN_PAREN, "(") \
@@ -70,11 +51,93 @@
     TOKEN(CTOK_COMMA, ",") \
     TOKEN(CTOK_HASH, "#") \
     TOKEN(CTOK_HASH_HASH, "##") \
-    /* constant types */ \
 
+#define KEYWORDS \
+    TOKEN(CTOK_ALIGNAS, "alignas") \
+    TOKEN(CTOK_ALIGNOF, "alignof") \
+    TOKEN(CTOK_AUTO, "auto") \
+    TOKEN(CTOK_BOOL, "bool") \
+    TOKEN(CTOK_BREAK, "break") \
+    TOKEN(CTOK_CASE, "case") \
+    TOKEN(CTOK_CHAR, "char") \
+    TOKEN(CTOK_CONST, "const") \
+    TOKEN(CTOK_CONSTEXPR, "constexpr") \
+    TOKEN(CTOK_CONTINUE, "continue") \
+    TOKEN(CTOK_DEFAULT, "default") \
+    TOKEN(CTOK_DO, "do") \
+    TOKEN(CTOK_DOUBLE, "double") \
+    TOKEN(CTOK_ELSE, "else") \
+    TOKEN(CTOK_ENUM, "enum") \
+    TOKEN(CTOK_EXTERN, "extern") \
+    TOKEN(CTOK_FALSE, "false") \
+    TOKEN(CTOK_FLOAT, "float") \
+    TOKEN(CTOK_FOR, "for") \
+    TOKEN(CTOK_GOTO, "goto") \
+    TOKEN(CTOK_IF, "if") \
+    TOKEN(CTOK_INLINE, "inline") \
+    TOKEN(CTOK_INT, "int") \
+    TOKEN(CTOK_LONG, "long") \
+    TOKEN(CTOK_NULLPTR, "nullptr") \
+    TOKEN(CTOK_REGISTER, "register") \
+    TOKEN(CTOK_RESTRICT, "restrict") \
+    TOKEN(CTOK_RETURN, "return") \
+    TOKEN(CTOK_SHORT, "short") \
+    TOKEN(CTOK_SIGNED, "signed") \
+    TOKEN(CTOK_SIZEOF, "sizeof") \
+    TOKEN(CTOK_STATIC, "static") \
+    TOKEN(CTOK_STATIC_ASSERT, "static_assert") \
+    TOKEN(CTOK_STRUCT, "struct") \
+    TOKEN(CTOK_SWITCH, "switch") \
+    TOKEN(CTOK_THREAD_LOCAL, "thread_local") \
+    TOKEN(CTOK_TRUE, "true") \
+    TOKEN(CTOK_TYPEDEF, "typedef") \
+    TOKEN(CTOK_TYPEOF, "typeof") \
+    TOKEN(CTOK_TYPEOF_UNQUAL, "typeof_unqual") \
+    TOKEN(CTOK_UNION, "union") \
+    TOKEN(CTOK_UNSIGNED, "unsigned") \
+    TOKEN(CTOK_VOID, "void") \
+    TOKEN(CTOK_VOLATILE, "volatile") \
+    TOKEN(CTOK_WHILE, "while") \
+    TOKEN(CTOK_ATOMIC, "_Atomic") \
+    TOKEN(CTOK_BITINT, "_BitInt") \
+    TOKEN(CTOK_COMPLEX, "_Complex") \
+    TOKEN(CTOK_DECIMAL128, "_Decimal128") \
+    TOKEN(CTOK_DECIMAL32, "_Decimal32") \
+    TOKEN(CTOK_DECIMAL64, "_Decimal64") \
+    TOKEN(CTOK_GENERIC, "_Generic") \
+    TOKEN(CTOK_IMAGINARY, "_Imaginary") \
+    TOKEN(CTOK_NORETURN, "_Noreturn") \
+
+#define TOKENS \
+    TOKEN(TOK_INVALID, "[INVALID]") \
+    TOKEN(TOK_WHITESPACE, "whitespace") \
+    /* token: */ \
+    TOKEN(TOK_KEYWORD, "keyword") \
+    TOKEN(TOK_IDENTIFIER, "identifier") \
+    TOKEN(TOK_CONSTANT, "constant") \
+    TOKEN(TOK_STR_LIT, "string-literal") \
+    TOKEN(TOK_PUNCT, "punctuator") \
+    /* preprocessing-token: */ \
+    TOKEN(PPTOK_HEADER_NAME, "header-name") \
+    TOKEN(PPTOK_IDENTIFIER, "pp-identifier") \
+    TOKEN(PPTOK_NUMBER, "pp-number") \
+    TOKEN(PPTOK_CHAR_CONST, "character-constant") \
+    TOKEN(PPTOK_STR_LIT, "pp-string-literal") \
+    TOKEN(PPTOK_PUNCT, "pp-punctuator") \
+    /* from here on, these are non-c tokens, but these make parsing easier. */ \
+    /* these get transformed during step 3 of compilation, before its supposed to. */ \
+    /* we still keep track of the c token type (token:), but we use itype for actual parsing */ \
+    /* punct */ \
+    PUNCT \
+    /* constant types */ \
+    /* C reserved keywords */ \
+    KEYWORDS
+     
+#define TOKEN_EXPANDER EVAL(TOKENS)
+    
 typedef enum: u8 {
 #define TOKEN(tok, str) tok,
-    TOKENS
+    TOKEN_EXPANDER
 #undef TOKEN
 } token_type;
 
@@ -117,6 +180,7 @@ int parser_phase3(parser_ctx* ctx);
 int parser_phase4(parser_ctx* ctx);
 int parser_phase5(parser_ctx* ctx);
 int parser_phase6(parser_ctx* ctx);
+int parser_phase7(parser_ctx* ctx);
 
 void print_token_stream(parser_ctx* ctx);
 

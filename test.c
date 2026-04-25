@@ -1,6 +1,8 @@
-int main() {
-    printf("xyz");
-    return 0;
+//empty macro function to force evaluation when using EVAL
+#define EMPTY() 
 
-    "xyz"      "123" "abc"
+EMPTY()
+
+int main() {
+    return 0;
 }

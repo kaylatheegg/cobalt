@@ -10,7 +10,7 @@
 
 char* token_str[] = {
 #define TOKEN(tok, str) str,
-    TOKENS
+    TOKEN_EXPANDER
 #undef TOKEN
 };
 
@@ -170,7 +170,6 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
         //only problem: we have to replace in place, so when we insert a token, we need to recursively call pp_replace_ident
         //first, verify the expansion is actually valid
         if (potential_define.is_variadic == false && vec_len(args) != vec_len(potential_define.arguments)) {
-            print_token_stream(ctx);
             print_parsing_error(ctx, replaced_tok, "macro "str_fmt" takes %d args, given %d", str_arg(replaced_tok.tok), vec_len(potential_define.arguments), vec_len(args));
             return -1;
         }
@@ -194,9 +193,10 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
         }
         //we now fix up the end of args, where there could be extra useless ws
         //this should just be one token's worth in each
-        for_vec(Vec(token)* arg, &args) {
-            if (arg[vec_len(arg) - 1]->type == TOK_WHITESPACE) {
-                vec_remove_ordered(arg, vec_len(arg) - 1);
+        for_vec(Vec(token)* arg_decl, &args) {
+            Vec(token) arg = *arg_decl;
+            if (arg[vec_len(arg) - 1].type == TOK_WHITESPACE) {
+                vec_remove_ordered(&arg, vec_len(arg) - 1);
             }
         }
 
@@ -374,7 +374,8 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
 
         //we can now expand tokens that originated from this process, by creating a fake pctx
         //we scan right to left to do this
-        for_n_reverse(i, 0, vec_len(replacement_list)) {
+
+        for_n_reverse(i, vec_len(replacement_list), 0) {
             token* tok = &replacement_list[i];
             parser_ctx temp_ctx = {.tokens = replacement_list,
                                    .logical_lines = ctx->logical_lines,
@@ -383,7 +384,7 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
                                    .curr_macro_name = *tok};
             if (tok->type == PPTOK_IDENTIFIER && tok->from_macro_param == true) {
                 if (string_eq(tok->tok, ctx->curr_macro_name.tok)) continue;
-                if (pp_replace_ident(&temp_ctx, i - 1) == -1) return -1;
+                if (pp_replace_ident(&temp_ctx, i) == -1) return -1;
                 //we need to update the replacement list with the temp_ctx's tokens
                 //replacement_list's old at pointer is completely invalid by this point,
                 //so we just need to update it.
@@ -392,7 +393,7 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
         }
 
         //now, we can expand any OTHER tokens.
-        for_n_reverse(i, 0, vec_len(replacement_list)) {
+        for_n_reverse(i, vec_len(replacement_list), 0) {
             token* tok = &replacement_list[i];
             parser_ctx temp_ctx = {.tokens = replacement_list,
                                    .logical_lines = ctx->logical_lines,
@@ -401,7 +402,7 @@ int pp_replace_ident(parser_ctx* ctx, size_t index) {
                                    .curr_macro_name = *tok};
             if (tok->type == PPTOK_IDENTIFIER) {
                 if (string_eq(tok->tok, ctx->curr_macro_name.tok)) continue;
-                if (pp_replace_ident(&temp_ctx, i - 1) == -1) return -1;
+                if (pp_replace_ident(&temp_ctx, i) == -1) return -1;
             
                 //we need to update the replacement list with the temp_ctx's tokens
                 //replacement_list's old at pointer is completely invalid by this point,
@@ -450,6 +451,12 @@ int parser_phase4(parser_ctx* ctx) {
     for_n(i, 0, vec_len(ctx->tokens)) {
         ctx->curr_tok_index = i;
         token* tok = &ctx->tokens[i];
+
+        printf("processing "str_fmt"\n", str_arg(tok->tok));
+
+        if (tok->tok.raw[0] != '#') {
+            printf("non hash!\n");
+        }
 
         if (tok->itype == CTOK_HASH && tok->after_newline == true) {
             size_t hash_location = ctx->curr_tok_index;
@@ -697,8 +704,6 @@ int handle_define(parser_ctx* ctx) {
                                           .replacement_list = vec_new(token, 1),
                                           .arguments = vec_new(token, 1)};
 
-
-
     size_t curr_line = curr_token().line;
 
     if (next_token().type != TOK_WHITESPACE && next_token().itype != CTOK_OPEN_PAREN) {
@@ -792,10 +797,10 @@ int handle_define(parser_ctx* ctx) {
 
     //before we finish, we need to get rid of any trailing or following ws
     //this should only be one tokens worth
-    if (new_def.replacement_list[vec_len(new_def.replacement_list) - 1].type == TOK_WHITESPACE) {        
+    if (vec_len(new_def.replacement_list) != 0 && new_def.replacement_list[vec_len(new_def.replacement_list) - 1].type == TOK_WHITESPACE) {        
         vec_remove_ordered(&new_def.replacement_list, vec_len(new_def.replacement_list) - 1);
     }
-    if (new_def.replacement_list[0].type == TOK_WHITESPACE) {
+    if (vec_len(new_def.replacement_list) != 0 && new_def.replacement_list[0].type == TOK_WHITESPACE) {
         vec_remove_ordered(&new_def.replacement_list, 0);
     }
 
