@@ -55,12 +55,11 @@ int pp_scan_identifier(parser_ctx* ctx) {
     return 0;
 }
 /*
-<pp-number> ::=
-    <digit> |
-    "." <digit> |
-    <pp-number> ("'" | E) (<digit> | <nondigit>) |
-    <pp-number> ("e" | "E" | "p" | "P") ("+" | "-") |
-    <pp-number> "."
+pp-number = digit |
+            "." digit |
+            pp-number "'" (digit | non-digit) |
+            pp-number ("e" | "E" | "p" | "p") ("+" | "-") |
+            pp-number "."
 */
 
 #define scan_next_char() \
